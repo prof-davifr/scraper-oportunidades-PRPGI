@@ -49,3 +49,12 @@ No lockfile exists; dependencies are tracked in `requirements.txt`.
 3. Use `db.add_opportunity_with_result(institution, title, link, description, pub_date, deadline)` to insert records.
 
 Current priority order (config.py `SOURCES`): CAPES, CNPq, FINEP, FAPESB, SETEC, CONFAP, EMBRAPII, BNDES, MCTI.
+
+## TODO.md
+
+Este projeto mantém um `TODO.md` na raiz com o planejamento e acompanhamento das tarefas.
+O agente é responsável por criar e manter este arquivo atualizado.
+
+O arquivo `TODO.md` da raiz de `/home/davi/projetos/` consolida automaticamente os TODOs de todos os subprojetos.
+Execute `python3 /home/davi/projetos/_gen_sumula.py` para regenerar a súmula consolidada após alterações neste TODO.md.
+
