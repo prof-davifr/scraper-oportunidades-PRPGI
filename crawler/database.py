@@ -217,7 +217,7 @@ class OpportunityDatabase:
 """
 
         inst_badges = "".join(
-            f'<span class="badge badge-{k.lower()}">{k} ({v})</span>'
+            f'<button class="badge badge-{k.lower()}" data-inst="{k}" onclick="filterByInst(\'{k}\')">{k} ({v})</button>'
             for k, v in sorted(totals.items())
         )
 
@@ -238,8 +238,11 @@ class OpportunityDatabase:
   header h1 {{ font-size: 1.5rem; font-weight: 700; margin-bottom: .25rem; }}
   header p {{ opacity: .85; font-size: .9rem; }}
   .stats {{ display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.25rem; }}
-  .badge {{ display: inline-block; padding: .35em .75em; border-radius: 20px; font-size: .8rem; font-weight: 600; background: #e0e0e0; color: #333; }}
+  .badge {{ display: inline-block; padding: .35em .75em; border-radius: 20px; font-size: .8rem; font-weight: 600; background: #e0e0e0; color: #333; border: 2px solid transparent; cursor: pointer; }}
+  .badge:hover {{ border-color: #165c33; }}
+  .badge.active {{ background: #165c33; color: #fff; border-color: #165c33; }}
   .badge-total {{ background: #165c33; color: #fff; }}
+  .badge-total.active {{ background: #0e3d21; }}
   .filter-bar {{ margin-bottom: 1rem; display: flex; gap: .5rem; flex-wrap: wrap; }}
   .filter-bar input, .filter-bar select {{
     padding: .5rem .75rem; border: 1px solid #ccc; border-radius: 6px; font-size: .9rem;
@@ -277,7 +280,7 @@ class OpportunityDatabase:
     <p>Oportunidades coletadas automaticamente — PRPGI / IFBA</p>
   </header>
   <div class="stats">
-    <span class="badge badge-total">Total: {total_count}</span>
+    <span class="badge badge-total" data-inst="" onclick="filterByInst('')">Total: {total_count}</span>
     {inst_badges}
   </div>
   <div class="filter-bar">
@@ -309,6 +312,13 @@ class OpportunityDatabase:
   </div>
 </div>
 <script>
+function filterByInst(inst) {{
+  document.getElementById('filterInst').value = inst;
+  document.querySelectorAll('.stats .badge').forEach(b => {{
+    b.classList.toggle('active', (b.getAttribute('data-inst') || '') === inst);
+  }});
+  filterTable();
+}}
 function filterTable() {{
   const q = document.getElementById('filterTitle').value.toLowerCase();
   const inst = document.getElementById('filterInst').value;
