@@ -10,11 +10,9 @@ Guia de links para busca de oportunidades de fomento, bolsas e editais de pesqui
 | **Federal** | FINEP | Chamadas Abertas - Inovação e Infraestrutura | [Acessar Oportunidades](https://www.finep.gov.br/oportunidades) |
 | **Federal** | CAPES | Pós-Graduação, Editais e Bolsas | [Acessar Editais](https://www.gov.br/capes/pt-br/assuntos/editais-e-resultados-capes) |
 | **Federal** | MCTI | Painel de Editais - Governo Federal | [Acessar Painel](https://www.gov.br/mcti/pt-br/acesso-a-informacao/editais) |
-| **Inovação** | BNDES | Projetos Estratégicos - Chamadas e Seleções | [Acessar Chamadas](https://www.bndes.gov.br/wps/portal/site/home/financiamento/agentes-financeiros-credenciados/chamadas-publicas) |
 | **Inovação** | SEBRAE | Editais Nacionais - Consultoria e Inovação | [Acessar Editais](https://sebrae.com.br/sites/PortalSebrae/editais) |
 | **Tecnologia/Redes** | RNP | Pesquisa e Redes - Grupos de Trabalho | [Acessar Chamadas](https://www.rnp.br/inovacao/editais-de-pesquisa-e-desenvolvimento) |
 | **Estadual (BA)** | FAPESB | Editais Bahia (FAP Bahia) | [Acessar Editais](https://www.fapesb.ba.gov.br/category/edital/) |
-| **Estadual (Geral)** | CONFAP | Todas as FAPs + Chamadas Internacionais | [Acessar Chamadas](https://news.confap.org.br/tag/editais/) |
 | **Privado** | Instituto Serrapilheira | Ciência e Inovação | [Acessar Chamadas](https://serrapilheira.org/chamadas-publicas/) |
 | **Internacional** | Erasmus+ | União Europeia - Programme Guide | [Acessar Portal](https://erasmus-plus.ec.europa.eu/programme-guide/erasmus-programme-guide) |
 | **Internacional** | DAAD | Alemanha - Bolsas e Auxílios | [Acessar Bolsas](https://www.daad.org.br/pt/bolsas-e-auxilios-no-brasil-e-na-alemanha/) |

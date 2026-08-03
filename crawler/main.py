@@ -158,6 +158,12 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         help="Export sem consolidação (uma linha por documento, incluindo duplicatas e atualizações).",
     )
     parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Diretório onde os arquivos de saída (db/csv/xlsx/html) serão gravados. Padrão: raiz do projeto.",
+    )
+    parser.add_argument(
         "--db-path",
         type=str,
         default=settings.db_path,
@@ -191,19 +197,33 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-if __name__ == "__main__":
-    args = parse_args()
+def main(argv: Optional[Iterable[str]] = None) -> None:
+    """Entry point da CLI (usado pelo comando instalado `scraper-oportunidades`)."""
+    args = parse_args(argv)
 
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s %(levelname)s %(name)s - %(message)s",
     )
 
+    if args.output_dir:
+        out = Path(args.output_dir).expanduser()
+        out.mkdir(parents=True, exist_ok=True)
+        db_path = str(out / "oportunidades.db")
+        csv_path = str(out / "editais.csv")
+        xlsx_path = str(out / "editais.xlsx")
+        html_path = str(out / "editais.html")
+    else:
+        db_path = args.db_path
+        csv_path = args.csv_path
+        xlsx_path = args.xlsx_path
+        html_path = args.html_path
+
     settings = Settings(
-        db_path=args.db_path,
-        csv_path=args.csv_path,
-        xlsx_path=args.xlsx_path,
-        html_path=args.html_path,
+        db_path=db_path,
+        csv_path=csv_path,
+        xlsx_path=xlsx_path,
+        html_path=html_path,
         log_level=args.log_level,
     )
     asyncio.run(
@@ -214,3 +234,7 @@ if __name__ == "__main__":
             no_consolidate=args.no_consolidate,
         )
     )
+
+
+if __name__ == "__main__":
+    main()

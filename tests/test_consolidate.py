@@ -79,7 +79,7 @@ class TestExtractRef:
         )
 
     def test_no_number_returns_none(self):
-        assert extract_ref("CONFAP e CDTI lançam chamada 2026-2027 para apoiar projetos colaborativos") is None
+        assert extract_ref("SEBRAE lança chamada 2026-2027 para apoiar projetos de inovação") is None
         assert extract_ref("Edital de Cinema 2026") is None
 
 
@@ -129,8 +129,8 @@ class TestConsolidate:
 
     def test_no_number_stays_separate(self):
         rows = [
-            _row("CONFAP e CDTI lançam chamada 2026-2027 para apoiar projetos colaborativos", inst="CONFAP", id=1),
-            _row("Chamada Rio Doce Participativo", inst="BNDES", id=2),
+            _row("SEBRAE lança chamada 2026-2027 para apoiar projetos de inovação", inst="SEBRAE", id=1),
+            _row("Chamada de Acesso a Crédito para Inovação", inst="FINEP", id=2),
         ]
         groups = consolidate_editais(rows)
         assert len(groups) == 2

@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from playwright.async_api import async_playwright
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
@@ -14,32 +14,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from crawler.http_utils import fetch_text, make_client
 
-STEALTH_JS = """
-Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-"""
 
 # Palavras que identificam o título de um edital/chamada
 _EDITAL_KEYWORDS = ("edital", "chamada", "chamamento", "seleção", "selecao",
                     "termo de referência", "tr nº", "processo seletivo")
-
-# Palavras de anexos/documentos que NÃO são o edital em si
-_ANNEX_KEYWORDS = ("anexo", "modelo", "formulário", "formulario", "termo de autorização",
-                   "termo de compromisso", "plano de trabalho", "carta de anuência",
-                   "declaração", "declaracao", "comprovante", "solicitação", "solicitacao")
-
-
-async def _create_stealth_context(browser):
-    context = await browser.new_context(
-        user_agent=(
-            "Mozilla/5.0 (X11; Linux x86_64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/145.0.0.0 Safari/537.36"
-        ),
-        viewport={"width": 1920, "height": 1080},
-    )
-    await context.add_init_script(STEALTH_JS)
-    return context
 
 
 class SetecParser:
@@ -48,93 +28,59 @@ class SetecParser:
         self.institution = "SETEC"
         self.max_items = max_items
 
-    async def _goto_with_retry(
-        self, page, url: str, attempts: int = 6, base_delay: float = 8.0
-    ) -> None:
-        """Navega com retry. O gov.br/MEC aplica CAPTCHA intermitente
-        ("human visitor") — detecta o bloqueio e espera antes de tentar de novo."""
-        last_exc = None
-        for attempt in range(1, attempts + 1):
-            try:
-                await page.goto(url, timeout=45000, wait_until="domcontentloaded")
-                await page.wait_for_timeout(4000)
-                try:
-                    body = await page.locator("body").inner_text()
-                except Exception:
-                    body = ""
-                if "human visitor" in body or "What code is in the image" in body:
-                    raise RuntimeError("CAPTCHA/anti-bot detected by gov.br/MEC")
-                return
-            except Exception as exc:
-                last_exc = exc
-                if attempt < attempts:
-                    sleep_time = base_delay * attempt
-                    logger.warning(
-                        "SETEC blocked (attempt %s/%s): %s. Aguardando %.1fs",
-                        attempt,
-                        attempts,
-                        exc,
-                        sleep_time,
-                    )
-                    await asyncio.sleep(sleep_time)
-        raise RuntimeError(f"SETEC navigation failed after {attempts} attempts") from last_exc
-
-    async def _get_year_links(self, page) -> list[str]:
+    def _get_year_links(self, soup: BeautifulSoup) -> list[str]:
         # Links de ano ficam sob o caminho da secretaria (ex.: .../editais/2026)
-        links = await page.locator(
-            'a[href*="/editais/202"], a[href*="/editais/anterior-a-2021"]'
-        ).all()
+        links = []
         seen = set()
-        result = []
-        for link in links:
-            href = await link.get_attribute("href")
+        for a in soup.select(
+            'a[href*="/editais/202"], a[href*="/editais/anterior-a-2021"]'
+        ):
+            href = a.get("href", "")
             if href and href not in seen:
                 seen.add(href)
-                result.append(href)
-        return result
+                links.append(href)
+        return links
 
-    async def _extract_edital_blocks(self, page) -> list[dict]:
+    @staticmethod
+    def _extract_edital_blocks(soup: BeautifulSoup) -> list[dict]:
         """Extrai blocos de edital da página de ano.
 
         Cada edital é um <p> (título, às vezes com link do PDF embutido)
         seguido de uma <ul> com anexos/documentos. Retorna um dict por
         edital com título real e link principal (PDF do edital)."""
-        return await page.evaluate("""() => {
-            const out = [];
-            const container = document.getElementById('parent-fieldname-text')
-                || document.getElementById('content');
-            if (!container) return out;
+        container = soup.select_one("#parent-fieldname-text") or soup.select_one("#content")
+        if not container:
+            return []
 
-            let current = null;
-            const isPdf = h => /\\.pdf(\\.|$)|\\/pdf\\//i.test(h || '');
-            const isEdital = t => /edital|chamada|chamamento|sele[çc][ãa]o|termo de refer[êe]ncia|processo seletivo/i.test(t || '');
-
-            for (const el of container.children) {
-                if (el.tagName === 'P') {
-                    // novo bloco candidato
-                    current = {
-                        title: el.textContent.trim(),
-                        primaryLink: '',
-                        primaryText: '',
-                        links: []
-                    };
-                    const a = el.querySelector('a[href]');
-                    if (a && (isPdf(a.href) || isEdital(a.textContent))) {
-                        current.primaryLink = a.href;
-                        current.primaryText = a.textContent.trim();
-                    }
-                    out.push(current);
-                } else if (el.tagName === 'UL' && current) {
-                    for (const li of el.querySelectorAll('li')) {
-                        const a = li.querySelector('a[href]');
-                        if (!a) continue;
-                        const text = li.textContent.trim();
-                        current.links.push({ text: text, href: a.href });
-                    }
+        out: list[dict] = []
+        for el in container.children:
+            if not getattr(el, "name", None):
+                continue
+            if el.name == "p":
+                current = {
+                    "title": el.get_text(" ", strip=True),
+                    "primaryLink": "",
+                    "primaryText": "",
+                    "links": [],
                 }
-            }
-            return out;
-        }""")
+                a = el.find("a", href=True)
+                if a:
+                    href = a["href"]
+                    if re.search(r"\.pdf|/pdf/", href, re.I) or re.search(
+                        r"edital|chamada|chamamento", a.get_text(" ", strip=True), re.I
+                    ):
+                        current["primaryLink"] = href
+                        current["primaryText"] = a.get_text(" ", strip=True).strip()
+                out.append(current)
+            elif el.name == "ul" and out:
+                for li in el.find_all("li"):
+                    a = li.find("a", href=True)
+                    if not a:
+                        continue
+                    out[-1]["links"].append(
+                        {"text": li.get_text(" ", strip=True), "href": a["href"]}
+                    )
+        return out
 
     def _pick_edital(self, block: dict) -> dict | None:
         """Decide se o bloco é um edital e qual link usar."""
@@ -231,73 +177,69 @@ class SetecParser:
     async def parse(self, db, max_items: int | None = None) -> dict[str, Any]:
         item_limit = self.max_items if max_items is None else max_items
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
-            )
-            context = await _create_stealth_context(browser)
-            page = await context.new_page()
+        inserted_count = 0
+        duplicate_count = 0
+        error_count = 0
+        processed = 0
 
+        async with make_client() as client:
             try:
-                await self._goto_with_retry(page, self.base_url)
-
-                year_links = await self._get_year_links(page)
-                logger.info("SETEC found %s year sub-pages", len(year_links))
-
-                inserted_count = 0
-                duplicate_count = 0
-                error_count = 0
-                processed = 0
-
-                for year_url in year_links:
-                    if item_limit is not None and processed >= item_limit:
-                        break
-
-                    year_page = await context.new_page()
-                    try:
-                        await self._goto_with_retry(year_page, year_url)
-                        blocks = await self._extract_edital_blocks(year_page)
-                    except Exception as e:
-                        error_count += 1
-                        logger.exception("Error scraping SETEC year page %s: %s", year_url, e)
-                        await year_page.close()
-                        continue
-                    await year_page.close()
-
-                    for block in blocks:
-                        if item_limit is not None and processed >= item_limit:
-                            break
-                        edital = self._pick_edital(block)
-                        if not edital:
-                            continue
-                        processed += 1
-                        try:
-                            result = db.add_opportunity_with_result(
-                                institution=self.institution,
-                                title=edital["title"],
-                                link=edital["link"],
-                                description=edital["title"],
-                                deadline="",
-                            )
-                            if result == "inserted":
-                                inserted_count += 1
-                            else:
-                                duplicate_count += 1
-                        except Exception as e:
-                            error_count += 1
-                            logger.exception("Error parsing SETEC item: %s", e)
-
+                html = await fetch_text(client, self.base_url)
+            except Exception as e:
+                logger.exception("SETEC main page fetch failed: %s", e)
                 return {
                     "institution": self.institution,
-                    "processed": processed,
-                    "new": inserted_count,
-                    "duplicates": duplicate_count,
-                    "errors": error_count,
+                    "processed": 0,
+                    "new": 0,
+                    "duplicates": 0,
+                    "errors": 1,
                 }
-            finally:
-                await page.close()
-                await browser.close()
+
+            soup = BeautifulSoup(html, "html.parser")
+            year_links = self._get_year_links(soup)
+            logger.info("SETEC found %s year sub-pages", len(year_links))
+
+            for year_url in year_links:
+                if item_limit is not None and processed >= item_limit:
+                    break
+                try:
+                    year_html = await fetch_text(client, year_url)
+                except Exception as e:
+                    error_count += 1
+                    logger.warning("SETEC year page failed %s: %s", year_url, e)
+                    continue
+
+                year_soup = BeautifulSoup(year_html, "html.parser")
+                for block in self._extract_edital_blocks(year_soup):
+                    if item_limit is not None and processed >= item_limit:
+                        break
+                    edital = self._pick_edital(block)
+                    if not edital:
+                        continue
+                    processed += 1
+                    try:
+                        result = db.add_opportunity_with_result(
+                            institution=self.institution,
+                            title=edital["title"],
+                            link=edital["link"],
+                            description=edital["title"],
+                            deadline="",
+                        )
+                        if result == "inserted":
+                            inserted_count += 1
+                        else:
+                            duplicate_count += 1
+                    except Exception as e:
+                        error_count += 1
+                        logger.exception("Error parsing SETEC item: %s", e)
+
+        return {
+            "institution": self.institution,
+            "processed": processed,
+            "new": inserted_count,
+            "duplicates": duplicate_count,
+            "errors": error_count,
+        }
 
 
 if __name__ == "__main__":

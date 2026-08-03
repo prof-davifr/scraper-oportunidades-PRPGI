@@ -87,20 +87,6 @@ class Settings:
             description="Secretaria de Educação Profissional e Tecnológica (SETEC/MEC)",
         ),
         Source(
-            name="confap",
-            module="crawler.parsers.confap",
-            class_name="ConfapParser",
-            url="https://news.confap.org.br/tag/editais/",
-            description="Conselho Nacional das Fundações Estaduais de Amparo à Pesquisa (CONFAP)",
-        ),
-        Source(
-            name="bndes",
-            module="crawler.parsers.bndes",
-            class_name="BndesParser",
-            url="https://www.bndes.gov.br/",
-            description="Banco Nacional de Desenvolvimento Econômico e Social (BNDES)",
-        ),
-        Source(
             name="mcti",
             module="crawler.parsers.mcti",
             class_name="MctiParser",

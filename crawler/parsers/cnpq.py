@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from playwright.async_api import async_playwright
+import httpx
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,8 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+from crawler.http_utils import fetch_text, make_client
 
 
 class CnpqParser:
@@ -22,111 +25,92 @@ class CnpqParser:
         self.institution = "CNPq"
         self.max_items = max_items
 
-    async def _goto_with_retry(
-        self, page, attempts: int = 4, base_delay: float = 3.0
-    ) -> None:
-        last_exc = None
-        for attempt in range(1, attempts + 1):
-            try:
-                await page.goto(self.url, timeout=45000, wait_until="domcontentloaded")
-                await page.wait_for_selector("#content div.item", timeout=25000)
-                return
-            except Exception as exc:
-                last_exc = exc
-                if attempt < attempts:
-                    sleep_time = base_delay * (2 ** (attempt - 1))
-                    logger.warning(
-                        "CNPq navigation failed (attempt %s/%s): %s. Retrying in %.1fs",
-                        attempt,
-                        attempts,
-                        exc,
-                        sleep_time,
-                    )
-                    await asyncio.sleep(sleep_time)
-        raise RuntimeError(f"CNPq navigation failed after {attempts} attempts") from last_exc
-
     async def parse(self, db, max_items: Optional[int] = None) -> Dict[str, Any]:
         item_limit = self.max_items if max_items is None else max_items
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            await self._goto_with_retry(page)
 
-            items = await page.locator("#content div.item").all()
+        inserted_count = 0
+        duplicate_count = 0
+        error_count = 0
+        processed = 0
 
-            inserted_count = 0
-            duplicate_count = 0
-            error_count = 0
-            processed = 0
+        async with make_client() as client:
+            try:
+                html = await fetch_text(client, self.url)
+            except Exception as e:
+                logger.exception("CNPq page fetch failed: %s", e)
+                return {
+                    "institution": self.institution,
+                    "processed": 0,
+                    "new": 0,
+                    "duplicates": 0,
+                    "errors": 1,
+                }
 
-            iterable = items if item_limit is None else items[:item_limit]
-            for item in iterable:
-                try:
-                    title_locator = item.locator("h2.headline a")
-                    if await title_locator.count() == 0:
-                        continue
+        soup = BeautifulSoup(html, "html.parser")
+        items = soup.select("#content div.item")
 
-                    title = (await title_locator.inner_text()).strip()
-                    if not title:
-                        continue
+        iterable = items if item_limit is None else items[:item_limit]
+        for item in iterable:
+            try:
+                title_el = item.select_one("h2.headline a")
+                if not title_el:
+                    continue
+                title = title_el.get_text(strip=True)
+                link = title_el.get("href", "")
+                if not title or not link:
+                    continue
 
-                    link = await title_locator.get_attribute("href")
-                    if not link:
-                        continue
+                text_content = item.get_text(" ", strip=True)
 
-                    text_content = (await item.inner_text()).strip()
+                # Data de publicação: "Publicado em DD/MM/AAAA HHhMM"
+                pub_date = ""
+                pub_el = item.select_one(".documentPublished .value")
+                if pub_el:
+                    m = re.search(r"(\d{2}/\d{2}/\d{4})", pub_el.get_text(strip=True))
+                    if m:
+                        d = m.group(1)
+                        pub_date = f"{d[6:]}-{d[3:5]}-{d[:2]}"
 
-                    # Data de publicação: "Publicado em DD/MM/AAAA HHhMM"
-                    pub_date = ""
-                    pub_loc = item.locator(".documentPublished .value")
-                    if await pub_loc.count() > 0:
-                        pub_raw = (await pub_loc.inner_text()).strip()
-                        m = re.search(r"(\d{2}/\d{2}/\d{4})", pub_raw)
-                        if m:
-                            d = m.group(1)
-                            pub_date = f"{d[6:]}-{d[3:5]}-{d[:2]}"
-
-                    # Prazo: "Inscrições: DD/MM/AAAA a DD/MM/AAAA" (ou INSCRIÇÕES:)
-                    deadline = ""
-                    m_insc = re.search(
-                        r"[Ii]nscri[çc][õo]es?:?\s*(\d{2}/\d{2}/\d{4})\s*a\s*(\d{2}/\d{2}/\d{4})",
+                # Prazo: "Inscrições: DD/MM/AAAA a DD/MM/AAAA" (ou INSCRIÇÕES:)
+                deadline = ""
+                m_insc = re.search(
+                    r"[Ii]nscri[çc][õo]es?:?\s*(\d{2}/\d{2}/\d{4})\s*a\s*(\d{2}/\d{2}/\d{4})",
+                    text_content,
+                )
+                if m_insc:
+                    deadline = m_insc.group(2)
+                else:
+                    m_insc2 = re.search(
+                        r"[Ii]nscri[çc][õo]es?:?\s*(\d{2}/\d{2}/\d{4})",
                         text_content,
                     )
-                    if m_insc:
-                        deadline = m_insc.group(2)
-                    else:
-                        m_insc2 = re.search(
-                            r"[Ii]nscri[çc][õo]es?:?\s*(\d{2}/\d{2}/\d{4})",
-                            text_content,
-                        )
-                        if m_insc2:
-                            deadline = m_insc2.group(1)
+                    if m_insc2:
+                        deadline = m_insc2.group(1)
 
-                    processed += 1
-                    result = db.add_opportunity_with_result(
-                        institution=self.institution,
-                        title=title,
-                        link=link,
-                        description=text_content[:200].strip().replace("\n", " ") + "...",
-                        pub_date=pub_date,
-                        deadline=deadline,
-                    )
-                    if result == "inserted":
-                        inserted_count += 1
-                    else:
-                        duplicate_count += 1
-                except Exception as e:
-                    error_count += 1
-                    logger.exception("Error parsing CNPq item: %s", e)
+                processed += 1
+                result = db.add_opportunity_with_result(
+                    institution=self.institution,
+                    title=title,
+                    link=link,
+                    description=text_content[:200].strip().replace("\n", " ") + "...",
+                    pub_date=pub_date,
+                    deadline=deadline,
+                )
+                if result == "inserted":
+                    inserted_count += 1
+                else:
+                    duplicate_count += 1
+            except Exception as e:
+                error_count += 1
+                logger.exception("Error parsing CNPq item: %s", e)
 
-            await browser.close()
-            return {
-                "institution": self.institution,
-                "processed": processed,
-                "new": inserted_count,
-                "duplicates": duplicate_count,
-                "errors": error_count,
-            }
+        return {
+            "institution": self.institution,
+            "processed": processed,
+            "new": inserted_count,
+            "duplicates": duplicate_count,
+            "errors": error_count,
+        }
 
 
 if __name__ == "__main__":

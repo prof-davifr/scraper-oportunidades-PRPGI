@@ -98,44 +98,33 @@ class TestCnpqParser:
         mock_db = MagicMock()
         mock_db.add_opportunity_with_result.return_value = "inserted"
 
-        with patch("crawler.parsers.cnpq.async_playwright") as mock_pw:
-            mock_page = AsyncMock()
-            mock_browser = AsyncMock()
-            mock_pw.return_value.__aenter__.return_value.chromium.launch.return_value = mock_browser
-            mock_browser.new_page.return_value = mock_page
+        html = """<div id="content">
+          <div class="item">
+            <h2 class="headline"><a href="https://www.gov.br/cnpq/pt-br/chamadas/todas-as-chamadas/chamada-no-24-2026/chamada-publica-cnpq-N-24-2026">Chamada CNPq nº 24/2026 - Teste</a></h2>
+            <div class="documentByLine"><span class="documentPublished"><span>Publicado em</span><span class="value">03/08/2026 10h55</span></span></div>
+            <p>Inscrições: 03/08/2026 a 18/09/2026</p>
+          </div>
+          <div class="item">
+            <h2 class="headline"><a href="https://www.gov.br/cnpq/pt-br/chamadas/todas-as-chamadas/chamada-no-25-2026/chamada-publica-cnpq-N-25-2026">Chamada CNPq/MCTI nº 25/2026 - Endometriose</a></h2>
+            <div class="documentByLine"><span class="documentPublished"><span>Publicado em</span><span class="value">10/07/2026 14h37</span></span></div>
+            <p>INSCRIÇÕES: 10/07/2026 a 15/09/2026</p>
+          </div>
+        </div>"""
 
-            mock_item = MagicMock()
-            title_loc = _make_item_locator(
-                count=1,
-                inner_text="Chamada CNPq nº 24/2026 - Teste",
-                get_attribute=(
-                    "https://www.gov.br/cnpq/pt-br/chamadas/todas-as-chamadas/"
-                    "chamada-no-24-2026/chamada-publica-cnpq-N-24-2026"
-                ),
-            )
-            pub_loc = _make_item_locator(count=1, inner_text="03/08/2026 10h55")
-
-            def _loc_side_effect(sel):
-                if sel == "h2.headline a":
-                    return title_loc
-                return pub_loc
-
-            mock_item.locator = MagicMock(side_effect=_loc_side_effect)
-            mock_item.inner_text = AsyncMock(
-                return_value="Inscrições: 03/08/2026 a 18/09/2026"
-            )
-
-            mock_page.locator = MagicMock(return_value=_make_page_locator(
-                [mock_item, mock_item]
-            ))
-
-            result = await parser.parse(mock_db)
+        with patch("crawler.parsers.cnpq.make_client") as mock_make:
+            mock_make.return_value.__aenter__ = AsyncMock()
+            mock_make.return_value.__exit__ = AsyncMock(return_value=False)
+            with patch(
+                "crawler.parsers.cnpq.fetch_text",
+                new=AsyncMock(return_value=html),
+            ):
+                result = await parser.parse(mock_db)
 
         assert result["institution"] == "CNPq"
         assert result["processed"] == 2
-        assert "new" in result
-        assert "duplicates" in result
-        assert "errors" in result
+        assert result["new"] == 2
+        assert result["duplicates"] == 0
+        assert result["errors"] == 0
 
 
 # ---- CapesParser tests ----
@@ -217,109 +206,6 @@ class TestCapesParser:
         assert result["new"] == 0
 
 
-# ---- ConfapParser tests ----
-class TestConfapParser:
-    @pytest.mark.asyncio
-    async def test_parse_returns_expected_keys(self):
-        from crawler.parsers.confap import ConfapParser
-
-        parser = ConfapParser(max_items=5)
-        mock_db = MagicMock()
-        mock_db.add_opportunity_with_result.return_value = "inserted"
-
-        with patch("crawler.parsers.confap.async_playwright") as mock_pw:
-            mock_page = AsyncMock()
-            mock_browser = AsyncMock()
-            mock_pw.return_value.__aenter__.return_value.chromium.launch.return_value = mock_browser
-            mock_browser.new_page.return_value = mock_page
-
-            mock_link = MagicMock()
-            mock_link.text_content = AsyncMock(
-                return_value="FAPEMA abre edital para inovacao"
-            )
-            mock_link.get_attribute = AsyncMock(
-                return_value="https://news.confap.org.br/fapema-edital-2026/"
-            )
-
-            mock_h2 = MagicMock()
-            mock_h2.count = AsyncMock(return_value=1)
-            mock_h2.text_content = AsyncMock(
-                return_value="FAPEMA abre edital para inovacao"
-            )
-            mock_link.locator = MagicMock(return_value=mock_h2)
-
-            mock_small = MagicMock()
-            mock_small.count = AsyncMock(return_value=1)
-            mock_small.text_content = AsyncMock(return_value="Em 12/06/2026")
-            mock_h2.locator = MagicMock(return_value=mock_small)
-
-            mock_page.locator = MagicMock(
-                return_value=_make_page_locator([mock_link])
-            )
-
-            result = await parser.parse(mock_db)
-
-        assert result["institution"] == "CONFAP"
-        assert result["processed"] == 1
-
-    @pytest.mark.asyncio
-    async def test_goto_with_retry_raises_after_max_attempts(self):
-        from crawler.parsers.confap import ConfapParser
-
-        parser = ConfapParser()
-
-        with patch("crawler.parsers.confap.async_playwright") as mock_pw:
-            mock_page = AsyncMock()
-            mock_browser = AsyncMock()
-            mock_pw.return_value.__aenter__.return_value.chromium.launch.return_value = mock_browser
-            mock_browser.new_page.return_value = mock_page
-            mock_page.goto = AsyncMock(side_effect=RuntimeError("Connection refused"))
-
-            with pytest.raises(RuntimeError, match="CONFAP navigation failed after 3 attempts"):
-                await parser._goto_with_retry(mock_page)
-
-
-# ---- BndesParser tests ----
-class TestBndesParser:
-    @pytest.mark.asyncio
-    async def test_parse_returns_expected_keys(self):
-        from crawler.parsers.bndes import BndesParser
-
-        parser = BndesParser(max_items=5)
-        mock_db = MagicMock()
-        mock_db.add_opportunity_with_result.return_value = "inserted"
-
-        with patch("crawler.parsers.bndes.async_playwright") as mock_pw:
-            mock_page = AsyncMock()
-            mock_page.url = "https://www.bndes.gov.br/wps/portal/site/home"
-            mock_browser = AsyncMock()
-            mock_pw.return_value.__aenter__.return_value.chromium.launch.return_value = mock_browser
-            mock_browser.new_page.return_value = mock_page
-
-            mock_card = MagicMock()
-            h2_loc = _make_item_locator(count=1, inner_text="Edital de Cinema 2026")
-            mock_card.locator = MagicMock(return_value=h2_loc)
-            mock_card.get_attribute = AsyncMock(
-                return_value=(
-                    "?1dmy&urile=wcm:path:/bndes_institucional/home/transparencia/"
-                    "patrocinios/selecao-publica-patrocinio-cultural-01-2026"
-                )
-            )
-            mock_card.inner_text = AsyncMock(
-                return_value="Edital de Cinema 2026 Inscrições até 13/08/2026"
-            )
-
-            mock_page.locator = MagicMock(
-                return_value=_make_page_locator([mock_card])
-            )
-
-            result = await parser.parse(mock_db)
-
-        assert result["institution"] == "BNDES"
-        assert result["processed"] == 1
-        assert result["new"] == 1
-
-
 # ---- MctiParser tests ----
 class TestMctiParser:
     @pytest.mark.asyncio
@@ -330,32 +216,27 @@ class TestMctiParser:
         mock_db = MagicMock()
         mock_db.add_opportunity_with_result.return_value = "inserted"
 
-        with patch("crawler.parsers.mcti.async_playwright") as mock_pw:
-            mock_page = AsyncMock()
-            mock_browser = AsyncMock()
-            mock_browser.new_context = AsyncMock()
-            mock_context = AsyncMock()
-            mock_context.new_page = AsyncMock(return_value=mock_page)
-            mock_browser.new_context.return_value = mock_context
-            mock_pw.return_value.__aenter__.return_value.chromium.launch.return_value = mock_browser
+        html = """<html><body>
+          <main>
+            <a href="https://www.gov.br/mcti/pt-br/acesso-a-informacao/editais/edital-no-66-2024-sei-mcti">EDITAL DE CHAMAMENTO PÚBLICO Nº 66/2024/SEI-MCTI</a>
+          </main>
+          <ul class="submenu navTree">
+            <li><a href="https://www.gov.br/mcti/pt-br/acesso-a-informacao/editais/edital-no-144-2020-sei-mctic">EDITAL DE CHAMAMENTO PÚBLICO Nº 144/2020</a></li>
+          </ul>
+        </body></html>"""
 
-            mock_item = MagicMock()
-            mock_item.inner_text = AsyncMock(
-                return_value="EDITAL DE CHAMAMENTO PÚBLICO Nº 66/2024/SEI-MCTI"
-            )
-            mock_item.get_attribute = AsyncMock(
-                return_value=(
-                    "https://www.gov.br/mcti/pt-br/acesso-a-informacao/"
-                    "editais/edital-no-66-2024-sei-mcti"
-                )
-            )
-
-            mock_page.locator = MagicMock(return_value=_make_page_locator([mock_item]))
-
-            result = await parser.parse(mock_db)
+        with patch("crawler.parsers.mcti.make_client") as mock_make:
+            mock_make.return_value.__aenter__ = AsyncMock()
+            mock_make.return_value.__exit__ = AsyncMock(return_value=False)
+            with patch(
+                "crawler.parsers.mcti.fetch_text",
+                new=AsyncMock(return_value=html),
+            ):
+                result = await parser.parse(mock_db)
 
         assert result["institution"] == "MCTI"
-        assert result["processed"] == 1
+        assert result["processed"] == 2
+        assert result["new"] == 2
 
 
 # ---- FapesbParser tests ----
@@ -368,44 +249,63 @@ class TestFapesbParser:
         mock_db = MagicMock()
         mock_db.add_opportunity_with_result.return_value = "inserted"
 
-        with patch("crawler.parsers.fapesb.async_playwright") as mock_pw:
-            mock_page = AsyncMock()
-            mock_browser = AsyncMock()
-            mock_pw.return_value.__aenter__.return_value.chromium.launch.return_value = mock_browser
-            mock_browser.new_page.return_value = mock_page
+        fake_posts = [
+            {
+                "title": {"rendered": "EDITAL TESTE 01/2026 - "},
+                "link": "https://www.fapesb.ba.gov.br/edital-teste-01-2026/",
+                "date": "2026-07-20T16:52:26",
+                "content": {"rendered": "<p>Descricao do edital</p>"},
+            },
+            {
+                "title": {"rendered": "CHAMADA TESTE 2026"},
+                "link": "https://www.fapesb.ba.gov.br/chamada-teste/",
+                "date": "2026-07-15T10:00:00",
+                "content": {"rendered": ""},
+            },
+        ]
 
-            mock_item = MagicMock()
-            mock_item.locator = MagicMock(return_value=_make_item_locator(
-                count=1,
-                inner_text="Test Edital FAPESB - ",
-                get_attribute="https://example.com/edital",
-            ))
-            mock_item.inner_text = AsyncMock(
-                return_value="Edital FAPESB description 15/07/2026"
-            )
+        mock_response = MagicMock()
+        mock_response.json = MagicMock(return_value=fake_posts)
+        mock_response.raise_for_status = MagicMock()
 
-            mock_page.locator = MagicMock(return_value=_make_page_locator([mock_item]))
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client_cls.return_value = mock_client
 
             result = await parser.parse(mock_db)
 
         assert result["institution"] == "FAPESB"
-        assert result["processed"] == 1
+        assert result["processed"] == 2
+        assert result["errors"] == 0
+        # título sem o "-" residual e data de publicação da API
+        calls = [c for c in mock_db.add_opportunity_with_result.call_args_list]
+        assert calls[0].kwargs["title"] == "EDITAL TESTE 01/2026"
+        assert calls[0].kwargs["pub_date"] == "2026-07-20"
+        assert calls[1].kwargs["pub_date"] == "2026-07-15"
 
     @pytest.mark.asyncio
-    async def test_goto_with_retry_raises_after_max_attempts(self):
+    async def test_parse_handles_api_error(self):
         from crawler.parsers.fapesb import FapesbParser
 
         parser = FapesbParser()
+        mock_db = MagicMock()
 
-        with patch("crawler.parsers.fapesb.async_playwright") as mock_pw:
-            mock_page = AsyncMock()
-            mock_browser = AsyncMock()
-            mock_pw.return_value.__aenter__.return_value.chromium.launch.return_value = mock_browser
-            mock_browser.new_page.return_value = mock_page
-            mock_page.goto = AsyncMock(side_effect=RuntimeError("Connection refused"))
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock(side_effect=RuntimeError("boom"))
 
-            with pytest.raises(RuntimeError, match="FAPESB navigation failed after 3 attempts"):
-                await parser._goto_with_retry(mock_page)
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client_cls.return_value = mock_client
+
+            result = await parser.parse(mock_db)
+
+        assert result["institution"] == "FAPESB"
+        assert result["errors"] == 1
+        assert result["processed"] == 0
 
 
 # ---- SetecParser tests ----
@@ -418,41 +318,31 @@ class TestSetecParser:
         mock_db = MagicMock()
         mock_db.add_opportunity_with_result.return_value = "inserted"
 
-        with patch("crawler.parsers.setec.async_playwright") as mock_pw:
-            mock_page = AsyncMock()
-            mock_page.locator.return_value.all = AsyncMock(return_value=[])
-            mock_page.close = AsyncMock()
+        html = """<html><body><div id="content">
+          <a href="https://www.gov.br/mec/pt-br/acesso-a-informacao/institucional/estrutura-organizacional/orgaos-especificos-singulares/secretaria-de-educacao-profissional/editais/2026">2026</a>
+          <a href="https://www.gov.br/mec/pt-br/acesso-a-informacao/institucional/estrutura-organizacional/orgaos-especificos-singulares/secretaria-de-educacao-profissional/editais/2025">2025</a>
+        </div></body></html>"""
+        year_html = """<html><body><div id="content"><div id="parent-fieldname-text">
+          <p><a href="https://www.gov.br/mec/pt-br/.../editais/2026/sei_7012727_edital_5.pdf">Edital nº 5 /2026</a> - Seleção de propostas de projetos de extensão</p>
+          <ul>
+            <li>Anexo I - <a href="https://www.gov.br/mec/pt-br/.../sei_7012732_documento.pdf">Termo de autorização</a></li>
+            <li><a href="https://www.gov.br/mec/pt-br/.../SEI_7062666_Retificacao_.pdf">Retificação de edital</a></li>
+          </ul>
+          <p><a href="https://www.gov.br/mec/pt-br/.../editais/2026/SEI_6991254_chamada.pdf">Chamada (documento Nº 6991254)</a> para seleção de unidades da Rede Federal</p>
+        </div></div></body></html>"""
 
-            mock_browser = MagicMock()
-            mock_browser.new_context = AsyncMock()
-            mock_context = AsyncMock()
-            mock_context.new_page = AsyncMock(return_value=mock_page)
-            mock_browser.new_context.return_value = mock_context
-            mock_browser.close = AsyncMock()
-
-            mock_pw_instance = MagicMock()
-            mock_pw_instance.chromium.launch = AsyncMock(return_value=mock_browser)
-            mock_pw.return_value.__aenter__.return_value = mock_pw_instance
-
-            with patch.object(parser, "_get_year_links", AsyncMock(return_value=[])):
+        with patch("crawler.parsers.setec.make_client") as mock_make:
+            mock_make.return_value.__aenter__ = AsyncMock()
+            mock_make.return_value.__exit__ = AsyncMock(return_value=False)
+            with patch(
+                "crawler.parsers.setec.fetch_text",
+                new=AsyncMock(side_effect=[html, year_html]),
+            ):
                 result = await parser.parse(mock_db)
 
         assert result["institution"] == "SETEC"
-        assert "processed" in result
-
-    @pytest.mark.asyncio
-    async def test_goto_with_retry_raises_after_max_attempts(self):
-        from crawler.parsers.setec import SetecParser
-
-        parser = SetecParser()
-
-        mock_page = AsyncMock()
-        mock_page.goto.side_effect = RuntimeError("Connection refused")
-
-        with pytest.raises(RuntimeError, match="SETEC navigation failed after 3 attempts"):
-            await parser._goto_with_retry(
-                mock_page, "https://example.com", attempts=3, base_delay=0.01
-            )
+        assert result["processed"] == 2
+        assert result["new"] == 2
 
 
 # ---- Config / Settings tests ----
@@ -466,10 +356,8 @@ class TestConfig:
         assert "capes" in s.source_names()
         assert "fapesb" in s.source_names()
         assert "setec" in s.source_names()
-        assert "confap" in s.source_names()
-        assert "bndes" in s.source_names()
         assert "mcti" in s.source_names()
-        assert len(s.source_names()) == 8
+        assert len(s.source_names()) == 6
 
     def test_get_source_find(self):
         from crawler.config import Settings

@@ -1,14 +1,15 @@
 # TODO — scraper-oportunidades-PRPGI
 
-Scraper de editais de fomento à pesquisa (CAPES, CNPq, FINEP, FAPESB, SETEC, CONFAP, BNDES, MCTI).
+Scraper de editais de fomento à pesquisa (CAPES, CNPq, FINEP, FAPESB, SETEC, MCTI).
 
 _Última atualização: 03/08/2026 (sessão: dados de lançamento + CNPq no novo site + limpeza CAPES + consolidação de editais)_
 
 ## Estado atual
 
-- Crawl completo: **03/08/2026** — **561 registros** no `oportunidades.db` (EMBRAPII removida do sistema)
+- Crawl completo: **03/08/2026** — **224 registros** no `oportunidades.db` (apenas 2025–2026; removidos EMBRAPII/CONFAP/BNDES e registros < 2025)
 - Distribuição no banco:
-  - CAPES 433 · SETEC 53 · FINEP 36 · FAPESB 18 · CONFAP 8 · CNPq 10 · BNDES 3
+  - CAPES 158 · FINEP 27 · FAPESB 20 · CNPq 10 · SETEC 9
+  - Por ano: 2026 = 153 · 2025 = 71
   - **MCTI: 0** (parser corrigido, aguardando site liberar do CAPTCHA)
 - **302 registros com data de lançamento** (CNPq 10/10, FINEP 36/36, CAPES 256/654)
 - Todos os 29 testes passam (`python -m pytest`).
@@ -17,11 +18,38 @@ _Última atualização: 03/08/2026 (sessão: dados de lançamento + CNPq no novo
 
 | Instituição | Registros | Estado | Última captura |
 |---|---|---|---|
-| CAPES | 433 | ✅ consistente; **resultados/homologações de seleção removidos** | 03/08 |
-| SETEC | 53 | ✅ **refeito** — 53 editais agrupados com títulos limpos (era 495 PDFs avulsos) | 03/08 |
-| FINEP | 36 | ✅ consistente; 36/36 com data | 03/08 |
-| FAPESB | 18 | ✅ consistente (sem datas — site não publica) | 03/08 |
+| CAPES | 158 | ✅ consistente; 174 com data (filenames SEI) | 03/08 |
+| SETEC | 9 | ✅ consistente; 29/53 com data (metadados PDF) | 03/08 |
+| FINEP | 27 | ✅ consistente; 27/27 com data | 03/08 |
+| FAPESB | 20 | ✅ consistente; 20/20 com data de lançamento (REST WP); 7/20 com prazo | 03/08 |
 | CNPq | 10 | ✅ **migrado para o novo site** (gov.br) — 10/10 com data | 03/08 |
+
+## Sessão 03/08 (tarde) — remoção da BNDES
+
+- **Decisão do usuário**: BNDES fora do escopo.
+- Removidos: entrada do `SOURCES` (`crawler/config.py`), arquivo `crawler/parsers/bndes.py`, testes do parser (42 passando), 3 registros do banco e menções em `README.md`, `fontes.md`, `AGENTS.md`.
+- Exports regenerados: 550 registros.
+
+## Sessão 03/08 (tarde) — remoção da CONFAP
+
+- **Decisão do usuário**: CONFAP não publica editais, só notícias — fora do escopo.
+- Removidos: entrada do `SOURCES` (`crawler/config.py`), arquivo `crawler/parsers/confap.py`, testes do parser (44 passando), 8 registros do banco e menções em `README.md`, `fontes.md`, `AGENTS.md`.
+- Exports regenerados: 553 registros.
+
+## Sessão 03/08 (tarde) — exclusão de registros anteriores a 2025
+
+- **Decisão do usuário**: manter apenas editais de 2025 em diante.
+- **328 registros excluídos** (CAPES 275, SETEC 44, FINEP 9): critério = ano extraído da data de publicação ou, na ausência, do título ("nº X/YYYY"), do nome do arquivo (SEI `DDMMYYYY_...`, `..._2024_...`) ou do caminho da URL (`editais/2026`, `edital-2023`). 0 registros ficaram sem classificação.
+- Total: 550 → **224 registros** (2026 = 153, 2025 = 71).
+- Exports regenerados.
+
+## Sessão 03/08 (tarde) — datas para SETEC e FAPESB
+
+- **Objetivo**: FAPESB e SETEC não publicavam datas de lançamento (campos vazios).
+- **FAPESB reescrita** (`crawler/parsers/fapesb.py`): migrada do Playwright para a **API REST do WordPress** (`wp-json/wp/v2/posts?categories=1`, categoria "Edital") — título, link e **data de publicação** (`date`) estáveis, sem navegador. Prazo de inscrição best-effort: o widget "⏰ Início/Encerramento" é template fixo do site (mesmas datas em todas as páginas — NÃO usado); prazos reais extraídos do corpo da página ("encerra-se em", "Após as 17h do dia") ou do cronograma no PDF do edital ("Encerramento do prazo..."). Filtro de ano ≥ 2025 descarta datas velhas do rodapé (2022/2024).
+- **SETEC** (`crawler/parsers/setec.py`): data de publicação via **metadados de criação do PDF** do edital (novo `crawler/pdf_utils.py` com pypdf + fallback regex), downloads concorrentes (semáforo 5).
+- **Resultado**: FAPESB **20/20 com data** (7/20 com prazo); SETEC **29/53 com data** (restante = PDFs com link morto 404 no gov.br). Registros FAPESB antigos em CAIXA ALTA sem data removidos (sósias com data).
+- Testes: parser FAPESB reescrito (httpx mock); 43 passando.
 
 ## Sessão 03/08 (tarde) — fix links FINEP
 
@@ -82,6 +110,18 @@ _Última atualização: 03/08/2026 (sessão: dados de lançamento + CNPq no novo
 - Ambiente restaurado (playwright/pandas/numpy corrompidos); `main.py` com bootstrap de `sys.path`.
 - CAPES/CNPq/BNDES/MCTI reparados; 150 registros-lixo do MCTI removidos.
 
+## Distribuição — exe Windows (03/08, noite)
+
+- **Objetivo**: outras pessoas (nível técnico zero) rodarem e gerarem suas tabelas — exe Windows com duplo clique.
+- **Playwright ELIMINADO**: todas as fontes funcionam com httpx puro. Parsers reescritos: cnpq, mcti, setec → httpx+BS4 (fapesb/capes/finep já eram). Exe sem browser (~30 MB, sem `playwright install`).
+- **`crawler/http_utils.py`** (novo): `fetch_text` com retry/backoff + detecção de CAPTCHA ("human visitor").
+- **`crawler/gui.py`** (novo): interface tkinter — botão "Gerar Editais", escolha de pasta, log de progresso; grava ao lado do exe.
+- **`scraper_exe.spec`** (novo): PyInstaller onefile, windowed, `collect_submodules('crawler')`.
+- **CI `build-windows`**: gera `GeradorEditais.exe` como artifact a cada push na main.
+- **CLI**: `main()` (entry point funcional), `--output-dir`; scripts `scraper-oportunidades` e `gerador-editais-gui`.
+- **pyproject**: deps corretas (httpx, bs4, pandas, openpyxl, pypdf; sem playwright).
+- Testes: +5 (http_utils); parsers atualizados p/ httpx. 47 passando.
+
 ## Pendências
 
 - [x] **SETEC — REFAZIDO** (URL: `gov.br/mec/pt-br/.../secretaria-de-educacao-profissional/editais`):
@@ -92,7 +132,7 @@ _Última atualização: 03/08/2026 (sessão: dados de lançamento + CNPq no novo
   - Obs.: SETEC não publica datas de lançamento — campo vazio.
 - [ ] **MCTI**: CAPTCHA intermitente — parser corrigido aguardando o site liberar para validar.
 - [ ] **CAPES**: 398/654 sem data (nome de arquivo sem DDMMYYYY). Explorar extração do texto do PDF via navegador (gov.br serve HTML para httpx).
-- [ ] **FAPESB**: não publica datas — avaliar se o campo "LANÇAMENTO:" é preenchido em algum edital.
+- [x] **FAPESB**: datas de lançamento resolvidas via API REST do WordPress (campo `date`).
 - [ ] **Ruff/CI**: 116 erros de lint pré-existentes — decidir limpeza ou ajuste do CI.
 - [ ] `pyproject.toml` dependencies desatualizadas (faltam httpx/bs4; entry point `main` inexistente).
 
@@ -126,8 +166,12 @@ _Última atualização: 03/08/2026 (sessão: dados de lançamento + CNPq no novo
 | 03/08/2026 | CAPES | 221 resultados de seleção removidos (CAPES 654 → 433; total 1253 → 1032) |
 | 03/08/2026 | exports | Consolidação: 590 registros → 231 grupos (59 multi-documento) |
 | 03/08/2026 | FINEP | 36 links migrados para /e/chamada-publica/{siteId}/{id} (antes oportunidades#!/...) |
+| 03/08/2026 | CONFAP | Removida do sistema (só notícias, sem editais) — 8 registros apagados |
+| 03/08/2026 | BNDES | Removida do sistema — 3 registros apagados |
+| 03/08/2026 | SETEC/FAPESB | Datas de publicação: FAPESB 20/20 (REST WP), SETEC 29/53 (metadados PDF); prazos FAPESB 7/20 |
+| 03/08/2026 | banco | Excluídos 328 registros < 2025 (550 → 224; 2026=153, 2025=71) |
 
 ## Fonte de referência
 
 - Guia de fontes: `fontes.md`
-- Fontes registradas em `crawler/config.py` (ordem: CAPES, CNPq, FINEP, FAPESB, SETEC, CONFAP, BNDES, MCTI)
+- Fontes registradas em `crawler/config.py` (ordem: CAPES, CNPq, FINEP, FAPESB, SETEC, MCTI)

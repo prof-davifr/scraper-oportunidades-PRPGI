@@ -1,7 +1,7 @@
-playwright
 httpx
 beautifulsoup4
 pandas
 openpyxl
+pypdf
 pytest
 pytest-asyncio
