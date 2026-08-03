@@ -1,3 +1,7 @@
 playwright
+httpx
+beautifulsoup4
 pandas
 openpyxl
+pytest
+pytest-asyncio

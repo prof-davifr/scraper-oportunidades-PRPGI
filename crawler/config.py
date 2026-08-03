@@ -55,7 +55,7 @@ class Settings:
             name="capes",
             module="crawler.parsers.capes",
             class_name="CapesParser",
-            url="https://www.gov.br/capes/pt-br/acesso-a-informacao/acoes-a-programas/bolsas/editais",
+            url="https://www.gov.br/capes/pt-br/assuntos/editais-e-resultados-capes",
             description="Coordenação de Aperfeiçoamento de Pessoal de Nível Superior (CAPES)",
         ),
         Source(
@@ -70,7 +70,7 @@ class Settings:
             module="crawler.parsers.finep",
             class_name="FinepParser",
             url="http://www.finep.gov.br/chamadas-publicas/chamadaspublicas?situacao=aberta",
-            description="Fundação de Amparo à Pesquisa do Estado de Minas Gerais (FINEP)",
+            description="Financiadora de Estudos e Projetos (FINEP)",
         ),
         Source(
             name="fapesb",
@@ -90,7 +90,7 @@ class Settings:
             name="confap",
             module="crawler.parsers.confap",
             class_name="ConfapParser",
-            url="https://confap.org.br/news/category/chamadas/",
+            url="https://news.confap.org.br/tag/editais/",
             description="Conselho Nacional das Fundações Estaduais de Amparo à Pesquisa (CONFAP)",
         ),
         Source(
@@ -104,7 +104,7 @@ class Settings:
             name="bndes",
             module="crawler.parsers.bndes",
             class_name="BndesParser",
-            url="https://www.bndes.gov.br/wps/portal/site/home/onde-atuamos/inovacao/chamadas-publicas",
+            url="https://www.bndes.gov.br/",
             description="Banco Nacional de Desenvolvimento Econômico e Social (BNDES)",
         ),
         Source(

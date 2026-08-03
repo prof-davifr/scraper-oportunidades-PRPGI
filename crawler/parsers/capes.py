@@ -63,13 +63,40 @@ class CapesParser:
 
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
             try:
-                program_urls = await self._get_program_urls(client)
+                main_r = await client.get(_MAIN_URL, headers=_HEADERS)
+                main_r.raise_for_status()
+                main_soup = BeautifulSoup(main_r.text, "html.parser")
+                program_urls = self._get_program_urls(main_soup)
+                direct_editais = self._get_direct_editais(main_soup)
             except Exception as e:
                 logger.exception("Failed to fetch CAPES main page: %s", e)
                 error_count += 1
                 program_urls = []
+                direct_editais = []
 
-            logger.info("Found %d CAPES program pages", len(program_urls))
+            logger.info("Found %d CAPES program pages, %d direct editais", len(program_urls), len(direct_editais))
+
+            # Insere editais listados diretamente na página principal
+            for title, link, desc_text in direct_editais:
+                if item_limit is not None and inserted_count >= item_limit:
+                    break
+                processed += 1
+                try:
+                    deadline = _extract_deadline(desc_text)
+                    result = db.add_opportunity_with_result(
+                        institution=self.institution,
+                        title=title.strip(),
+                        link=link,
+                        description=desc_text[:500].strip(),
+                        deadline=deadline,
+                    )
+                    if result == "inserted":
+                        inserted_count += 1
+                    else:
+                        duplicate_count += 1
+                except Exception as e:
+                    error_count += 1
+                    logger.exception("Error inserting CAPES edital: %s", e)
 
             sem = asyncio.Semaphore(5)
 
@@ -118,18 +145,33 @@ class CapesParser:
             "errors": error_count,
         }
 
-    async def _get_program_urls(self, client: httpx.AsyncClient):
-        r = await client.get(_MAIN_URL, headers=_HEADERS)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, "html.parser")
+    def _get_program_urls(self, soup: BeautifulSoup):
         urls = []
-        for tile in soup.select(".tile-content"):
-            for a in tile.select("a[href]"):
-                href = a.get("href", "")
-                text = a.get_text(strip=True)
-                if href and text and "acoes-e-programas" in href:
-                    urls.append((text, href if href.startswith("http") else "https://www.gov.br" + href))
+        seen = set()
+        # A página mudou: os links de programas não ficam mais em .tile-content;
+        # agora são links diretos com "acoes-e-programas" no href.
+        for a in soup.select('a[href*="acoes-e-programas"]'):
+            href = a.get("href", "")
+            text = a.get_text(strip=True)
+            if not href or not text or href in seen:
+                continue
+            seen.add(href)
+            full = href if href.startswith("http") else "https://www.gov.br" + href
+            urls.append((text, full))
         return urls
+
+    def _get_direct_editais(self, soup: BeautifulSoup):
+        """Editais (PDFs) listados diretamente na página principal da CAPES."""
+        results = []
+        for a in soup.select('a[href*=".pdf"]'):
+            href = a.get("href", "")
+            text = a.get_text(strip=True)
+            if not text or not _is_main_edital(text):
+                continue
+            link = _sanitize_pdf_url(href)
+            parent_text = (a.parent.get_text(strip=True) if a.parent else "") or text
+            results.append((text, link, parent_text))
+        return results
 
     async def _scrape_program_page(self, client: httpx.AsyncClient, url: str):
         r = await client.get(url, headers=_HEADERS)

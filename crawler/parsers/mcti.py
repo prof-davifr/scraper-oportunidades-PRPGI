@@ -68,32 +68,46 @@ class MctiParser:
             page = await context.new_page()
             await self._goto_with_retry(page)
 
-            items = await page.locator(".item").all()
-            if not items:
-                items = await page.locator("li").all()
+            # Os editais do MCTI ficam no conteúdo principal e no submenu
+            # "Editais" da navegação lateral — links .state-published com
+            # "editais" no href (ou DOU via in.gov.br). O fallback genérico
+            # para "li" capturava ruído do menu/rodapé (bug antigo).
+            items = await page.locator(
+                'main a[href], ul.submenu.navTree a[href]'
+            ).all()
 
             inserted_count = 0
             duplicate_count = 0
             error_count = 0
+            processed = 0
 
-            iterable = items if item_limit is None else items[:item_limit]
-            for item in iterable:
+            seen_links = set()
+            for item in items:
+                if item_limit is not None and processed >= item_limit:
+                    break
                 try:
-                    title_locator = item.locator("h3 a")
-                    if await title_locator.count() == 0:
-                        title_locator = item.locator("a")
-                    if await title_locator.count() == 0:
+                    title = (await item.inner_text()).strip()
+                    link = await item.get_attribute("href")
+                    if not title or not link:
                         continue
 
-                    title = await title_locator.inner_text()
-                    if not title.strip():
+                    # Mantém apenas links de editais/chamadas (ou DOU).
+                    if not re.search(
+                        r"editais|edital|chamada|in\.gov\.br",
+                        link + " " + title,
+                        re.IGNORECASE,
+                    ):
                         continue
 
-                    link = await title_locator.get_attribute("href")
-                    if link and not link.startswith("http"):
-                        link = f"https://www.gov.br{link}"
+                    if link in seen_links:
+                        continue
+                    seen_links.add(link)
 
-                    desc_text = await item.inner_text()
+                    if link.startswith("/"):
+                        link = "https://www.gov.br" + link
+
+                    processed += 1
+                    desc_text = title
 
                     deadline = ""
                     deadline_match = re.search(r"(\d{2}/\d{2}/\d{4})", desc_text)
@@ -102,7 +116,7 @@ class MctiParser:
 
                     result = db.add_opportunity_with_result(
                         institution=self.institution,
-                        title=title.strip(),
+                        title=title,
                         link=link,
                         description=desc_text[:200].strip().replace("\n", " ") + "...",
                         deadline=deadline,
@@ -118,7 +132,7 @@ class MctiParser:
             await browser.close()
             return {
                 "institution": self.institution,
-                "processed": len(iterable),
+                "processed": processed,
                 "new": inserted_count,
                 "duplicates": duplicate_count,
                 "errors": error_count,

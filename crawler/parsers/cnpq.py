@@ -2,6 +2,7 @@ import asyncio
 import logging
 import re
 import sys
+import urllib.parse
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -27,7 +28,7 @@ class CnpqParser:
         for attempt in range(1, attempts + 1):
             try:
                 await page.goto(self.url, timeout=30000, wait_until="domcontentloaded")
-                await page.wait_for_selector("li h4", timeout=15000)
+                await page.wait_for_selector("ol.list-chamadas li", timeout=20000)
                 return
             except Exception as exc:
                 last_exc = exc
@@ -49,9 +50,9 @@ class CnpqParser:
             browser = await p.chromium.launch(headless=True)
             page = await browser.new_page()
             await self._goto_with_retry(page)
-            
-            items = await page.locator("li").all()
-            
+
+            items = await page.locator("ol.list-chamadas > li").all()
+
             inserted_count = 0
             duplicate_count = 0
             error_count = 0
@@ -62,35 +63,44 @@ class CnpqParser:
                     title_locator = item.locator("h4")
                     if await title_locator.count() == 0:
                         continue
-                        
+
                     title = await title_locator.inner_text()
                     if not title.strip():
                         continue
-                        
-                    link_locator = item.locator('a.btn[alt="Chamada"]')
-                    if await link_locator.count() == 0:
-                        continue
-                    
-                    link = await link_locator.get_attribute("href")
-                    if link and not link.startswith("http"):
-                        link = f"http://memoria2.cnpq.br{link}"
-                    
+
                     text_content = await item.inner_text()
-                    
+
+                    # Link: a página de detalhe é construída com o idDivulgacao
+                    # presente nos links de compartilhamento (a.facebook).
+                    link = ""
+                    share_url = await item.locator('a.facebook').first.get_attribute("href")
+                    m = re.search(r"idDivulgacao=(\d+)", urllib.parse.unquote(share_url or ""))
+                    if m:
+                        divulgacao_id = m.group(1)
+                        link = (
+                            "http://memoria2.cnpq.br/web/guest/chamadas-publicas?"
+                            "p_p_id=resultadosportlet_WAR_resultadoscnpqportlet_INSTANCE_0ZaM"
+                            "&filtro=abertas&detalha=chamadaDivulgada"
+                            f"&idDivulgacao={divulgacao_id}"
+                        )
+
+                    if not link:
+                        continue
+
                     deadline = ""
-                    if "Inscrições:" in text_content:
-                        dates = re.findall(r'(\d{2}/\d{2}/\d{4})', text_content)
+                    if "Inscrições:" in text_content or "Inscri\u00e7\u00f5es:" in text_content:
+                        dates = re.findall(r"(\d{2}/\d{2}/\d{4})", text_content)
                         if len(dates) >= 2:
                             deadline = dates[1]
                         elif len(dates) == 1:
                             deadline = dates[0]
-                    
+
                     result = db.add_opportunity_with_result(
                         institution=self.institution,
                         title=title.strip(),
                         link=link,
-                        description=text_content[:200].strip().replace('\n', ' ') + "...",
-                        deadline=deadline
+                        description=text_content[:200].strip().replace("\n", " ") + "...",
+                        deadline=deadline,
                     )
                     if result == "inserted":
                         inserted_count += 1
@@ -99,7 +109,7 @@ class CnpqParser:
                 except Exception as e:
                     error_count += 1
                     logger.exception("Error parsing CNPq item: %s", e)
-            
+
             await browser.close()
             return {
                 "institution": self.institution,

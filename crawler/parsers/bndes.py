@@ -4,6 +4,7 @@ import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
+from urllib.parse import urljoin
 
 from playwright.async_api import async_playwright
 
@@ -17,7 +18,9 @@ if str(PROJECT_ROOT) not in sys.path:
 
 class BndesParser:
     def __init__(self, max_items: Optional[int] = 50):
-        self.url = "https://www.bndes.gov.br/wps/portal/site/home/onde-atuamos/inovacao/chamadas-publicas"
+        # O site foi reestruturado: a página antiga de chamadas públicas retorna
+        # 404. Os editais/chamadas ativos são destacados na página inicial.
+        self.url = "https://www.bndes.gov.br/"
         self.institution = "BNDES"
         self.max_items = max_items
 
@@ -27,7 +30,8 @@ class BndesParser:
         last_exc = None
         for attempt in range(1, attempts + 1):
             try:
-                await page.goto(self.url, timeout=30000, wait_until="domcontentloaded")
+                await page.goto(self.url, timeout=45000, wait_until="domcontentloaded")
+                await page.wait_for_timeout(4000)
                 return
             except Exception as exc:
                 last_exc = exc
@@ -50,43 +54,49 @@ class BndesParser:
             page = await browser.new_page()
             await self._goto_with_retry(page)
 
-            items = await page.locator(".item").all()
-            if not items:
-                items = await page.locator("li").all()
+            # Cards de destaque da home que apontam para editais/chamadas/seleções.
+            cards = await page.locator('a[href*="urile"]').all()
 
             inserted_count = 0
             duplicate_count = 0
             error_count = 0
+            processed = 0
 
-            iterable = items if item_limit is None else items[:item_limit]
-            for item in iterable:
+            for card in cards:
+                if item_limit is not None and processed >= item_limit:
+                    break
                 try:
-                    title_locator = item.locator("a")
-                    if await title_locator.count() == 0:
-                        title_locator = item.locator("h3 a")
-                    if await title_locator.count() == 0:
+                    h2 = card.locator("figcaption h2")
+                    if await h2.count() == 0:
+                        continue
+                    title = (await h2.inner_text()).strip()
+                    if not title:
                         continue
 
-                    title = await title_locator.inner_text()
-                    if not title.strip():
+                    href = await card.get_attribute("href")
+                    if not href:
+                        continue
+                    link = urljoin(page.url, href)
+
+                    # Filtra apenas conteúdos de edital/chamada/seleção
+                    if not re.search(
+                        r"edital|chamada|sele[çc][ãa]o", title + " " + link, re.IGNORECASE
+                    ):
                         continue
 
-                    link = await title_locator.get_attribute("href")
-                    if link and not link.startswith("http"):
-                        link = f"https://www.bndes.gov.br{link}"
-
-                    desc_text = await item.inner_text()
+                    text_content = await card.inner_text()
+                    processed += 1
 
                     deadline = ""
-                    deadline_match = re.search(r"(\d{2}/\d{2}/\d{4})", desc_text)
+                    deadline_match = re.search(r"(\d{2}/\d{2}/\d{4})", text_content)
                     if deadline_match:
                         deadline = deadline_match.group(1)
 
                     result = db.add_opportunity_with_result(
                         institution=self.institution,
-                        title=title.strip(),
+                        title=title,
                         link=link,
-                        description=desc_text[:200].strip().replace("\n", " ") + "...",
+                        description=text_content[:200].strip().replace("\n", " ") + "...",
                         deadline=deadline,
                     )
                     if result == "inserted":
@@ -100,7 +110,7 @@ class BndesParser:
             await browser.close()
             return {
                 "institution": self.institution,
-                "processed": len(iterable),
+                "processed": processed,
                 "new": inserted_count,
                 "duplicates": duplicate_count,
                 "errors": error_count,

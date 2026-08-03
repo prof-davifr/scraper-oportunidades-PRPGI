@@ -1,62 +1,75 @@
 # scraper-oportunidades-PRPGI
 
-Web scraper for Brazilian research funding opportunities ("editais"). Collects from FINEP and CNPq, stores in SQLite, exports to CSV/Excel.
+Web scraper para editais de fomento à pesquisa brasileiros. Coleta de **CAPES, CNPq, FINEP, FAPESB, SETEC, CONFAP, EMBRAPII, BNDES, MCTI**, armazena em SQLite e exporta para CSV/Excel/HTML.
 
-## Prerequisites
+## Pré-requisitos
 
 ```bash
 pip install -r requirements.txt
 playwright install chromium
 ```
 
-## Running
+## Execução
 
-**Full crawl** (FINEP + CNPq) — run from the project root:
+**Crawl completo** (todas as fontes) — rodar da raiz do projeto:
 
 ```bash
 python crawler/main.py
 ```
 
-**Single parser:**
+**Parser específico:**
 
 ```bash
-python crawler/parsers/finep.py
+python crawler/parsers/capes.py
 python crawler/parsers/cnpq.py
 ```
 
-Optional parser selection/limits from the main runner:
+Filtros opcionais:
 
 ```bash
-python crawler/main.py --parser finep
-python crawler/main.py --parser cnpq --max-items 30
+python crawler/main.py --parser capes|cnpq|finep|fapesb|setec|confap|embrapii|bndes|mcti|all --max-items N
 ```
 
-## Output
+## Saídas
 
-- `oportunidades.db` — SQLite database (root level)
-- `editais.csv` — CSV with BOM (`utf-8-sig`) for Excel compatibility
-- `editais.xlsx` — Excel workbook
+- `oportunidades.db` — banco SQLite (raiz do projeto)
+- `editais.csv` — CSV com BOM (`utf-8-sig`) para compatibilidade com Excel
+- `editais.xlsx` — planilha Excel
+- `editais.html` — página HTML standalone (responsiva, ordenável e filtrável)
 
-Spreadsheets are only regenerated when new opportunities are found.
+As planilhas são regeneradas apenas quando há novos registros.
 
-## How it works
+## Como funciona
 
-- `crawler/main.py` — orchestrates parsers and export
-- `crawler/database.py` — SQLite layer with SHA256 dedup on (title, link), deterministic export ordering, and count helpers
-- `crawler/parsers/finep.py` — scrapes `finep.gov.br` (`.item` selector)
-- `crawler/parsers/cnpq.py` — scrapes `memoria2.cnpq.br` (`li` elements, Liferay portal)
+- `crawler/main.py` — orquestra parsers e exportação
+- `crawler/database.py` — camada SQLite com deduplicação SHA256 em (título, link)
+- `crawler/parsers/` — um módulo por fonte:
+  - **capes.py** — httpx + BeautifulSoup (sem Playwright). Busca a página de editais, extrai links de programas (`acoes-e-programas`) e PDFs diretos de editais.
+  - **cnpq.py** — Playwright em `memoria2.cnpq.br` (`ol.list-chamadas`); link de detalhe construído a partir do `idDivulgacao`.
+  - **finep.py** — httpx REST API (`/o/c/chamadapublicas`), filtra `situacao.key == "aberta"`.
+  - **fapesb.py, setec.py, mcti.py** — Playwright (portal gov.br e fapesb.ba.gov.br).
+  - **confap.py** — Playwright em `news.confap.org.br/tag/editais/` (WordPress).
+  - **embrapii.py** — Playwright em `/transparencia/` (WordPress), links `a[href*="chamadas-publicas"]`.
+  - **bndes.py** — Playwright na home (`bndes.gov.br`); captura cards de destaque de editais/chamadas/seleções (a página antiga de chamadas públicas retorna 404).
 
-Parsers use navigation retry with exponential backoff and keep per-item failure isolation, so one bad item does not abort the full crawl.
+Parsers usam retry com backoff exponencial e isolam falhas por item.
 
-## Adding a new parser
+## Adicionar um novo parser
 
-1. Create `crawler/parsers/<name>.py` with a class exposing:
+1. Criar `crawler/parsers/<nome>.py` com classe expondo:
    - `institution` (str)
-   - `parse(db)` (async, returns parser stats or new record count)
-2. Add it to the `parsers` list in `crawler/main.py`.
-3. Insert records via `db.add_opportunity(institution, title, link, description, pub_date, deadline)`.
+   - `parse(db)` (async, retorna stats ou contagem)
+2. Adicionar ao `SOURCES` em `crawler/config.py` (o config auto-registra).
+3. Inserir registros via `db.add_opportunity_with_result(institution, title, link, description, pub_date, deadline)`.
 
-## Known issues
+## Problemas conhecidos
 
-- Government sites (`finep.gov.br`, `memoria2.cnpq.br`) are slow and may return 5xx errors. Parsers handle this gracefully and return 0 results.
-- Playwright browser binaries are required (`playwright install chromium`) after dependency installation.
+- **SETEC/MEC**: o site `gov.br/mec` está atrás de CAPTCHA anti-bot ("This question is for testing whether you are a human visitor"). O parser retorna 0 registros enquanto durar o bloqueio.
+- Sites governamentais (`memoria2.cnpq.br`, `finep.gov.br`, `gov.br`) são lentos e podem retornar 5xx. Parsers tratam com graça e retornam 0.
+- Playwright exige binários do Chromium (`playwright install chromium`).
+
+## Testes
+
+```bash
+python -m pytest
+```

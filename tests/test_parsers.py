@@ -324,27 +324,33 @@ class TestBndesParser:
 
         with patch("crawler.parsers.bndes.async_playwright") as mock_pw:
             mock_page = AsyncMock()
+            mock_page.url = "https://www.bndes.gov.br/wps/portal/site/home"
             mock_browser = AsyncMock()
             mock_pw.return_value.__aenter__.return_value.chromium.launch.return_value = mock_browser
             mock_browser.new_page.return_value = mock_page
 
-            mock_item = MagicMock()
-            a_loc = _make_item_locator(
-                count=1,
-                inner_text="Test Edital BNDES",
-                get_attribute="https://example.com/edital",
+            mock_card = MagicMock()
+            h2_loc = _make_item_locator(count=1, inner_text="Edital de Cinema 2026")
+            mock_card.locator = MagicMock(return_value=h2_loc)
+            mock_card.get_attribute = AsyncMock(
+                return_value=(
+                    "?1dmy&urile=wcm:path:/bndes_institucional/home/transparencia/"
+                    "patrocinios/selecao-publica-patrocinio-cultural-01-2026"
+                )
             )
-            mock_item.locator = MagicMock(return_value=a_loc)
-            mock_item.inner_text = AsyncMock(
-                return_value="Some description 15/06/2026 here"
+            mock_card.inner_text = AsyncMock(
+                return_value="Edital de Cinema 2026 Inscrições até 13/08/2026"
             )
 
-            mock_page.locator = MagicMock(return_value=_make_page_locator([mock_item]))
+            mock_page.locator = MagicMock(
+                return_value=_make_page_locator([mock_card])
+            )
 
             result = await parser.parse(mock_db)
 
         assert result["institution"] == "BNDES"
         assert result["processed"] == 1
+        assert result["new"] == 1
 
 
 # ---- MctiParser tests ----
@@ -367,15 +373,14 @@ class TestMctiParser:
             mock_pw.return_value.__aenter__.return_value.chromium.launch.return_value = mock_browser
 
             mock_item = MagicMock()
-            h3_loc = _make_item_locator(count=0)
-            a_loc = _make_item_locator(
-                count=1,
-                inner_text="Test Edital MCTI",
-                get_attribute="https://example.com/edital",
-            )
-            mock_item.locator = MagicMock(side_effect=[h3_loc, a_loc])
             mock_item.inner_text = AsyncMock(
-                return_value="Description here 10/10/2026 deadline"
+                return_value="EDITAL DE CHAMAMENTO PÚBLICO Nº 66/2024/SEI-MCTI"
+            )
+            mock_item.get_attribute = AsyncMock(
+                return_value=(
+                    "https://www.gov.br/mcti/pt-br/acesso-a-informacao/"
+                    "editais/edital-no-66-2024-sei-mcti"
+                )
             )
 
             mock_page.locator = MagicMock(return_value=_make_page_locator([mock_item]))
