@@ -42,6 +42,37 @@ def _extract_deadline(text: str) -> str:
     return ""
 
 
+def _extract_pub_date(text: str) -> str:
+    """Extrai a data de lançamento/publicação do edital (ISO YYYY-MM-DD)."""
+    # Padrões explícitos: "Publicado em DD/MM/AAAA", "data de publicação: ..."
+    m = re.search(
+        r"(?:publicad[oa]|publica[çc][ãa]o|lançad[oa]|lançamento)[^0-9]{0,25}(\d{2}/\d{2}/\d{4})",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        d = m.group(1)
+        return f"{d[6:]}-{d[3:5]}-{d[:2]}"
+    # Fallback: primeira data do texto (geralmente a de publicação)
+    dates = re.findall(r"(\d{2}/\d{2}/\d{4})", text)
+    if dates:
+        d = dates[0]
+        return f"{d[6:]}-{d[3:5]}-{d[:2]}"
+    return ""
+
+
+def _extract_pub_date_from_filename(link: str) -> str:
+    """Data de publicação embutida no nome do arquivo (padrão SEI/gov.br:
+    DDMMYYYY_...). Aproximação usada quando a página não expõe a data."""
+    fname = link.split("/")[-1]
+    for m in re.finditer(r"(\d{8})", fname):
+        s = m.group(1)
+        d, mo, y = int(s[0:2]), int(s[2:4]), int(s[4:8])
+        if 1 <= d <= 31 and 1 <= mo <= 12 and 1950 <= y <= 2035:
+            return f"{y}-{mo:02d}-{d:02d}"
+    return ""
+
+
 def _sanitize_pdf_url(raw: str) -> str:
     if not raw.startswith("http"):
         raw = "https://www.gov.br" + raw
@@ -83,11 +114,13 @@ class CapesParser:
                 processed += 1
                 try:
                     deadline = _extract_deadline(desc_text)
+                    pub_date = _extract_pub_date(desc_text) or _extract_pub_date_from_filename(link)
                     result = db.add_opportunity_with_result(
                         institution=self.institution,
                         title=title.strip(),
                         link=link,
                         description=desc_text[:500].strip(),
+                        pub_date=pub_date,
                         deadline=deadline,
                     )
                     if result == "inserted":
@@ -116,11 +149,13 @@ class CapesParser:
                         processed += 1
                         try:
                             deadline = _extract_deadline(desc_text)
+                            pub_date = _extract_pub_date(desc_text) or _extract_pub_date_from_filename(link)
                             result = db.add_opportunity_with_result(
                                 institution=self.institution,
                                 title=title.strip(),
                                 link=link,
                                 description=desc_text[:500].strip(),
+                                pub_date=pub_date,
                                 deadline=deadline,
                             )
                             if result == "inserted":

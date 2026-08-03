@@ -2,7 +2,6 @@ import asyncio
 import logging
 import re
 import sys
-import urllib.parse
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -15,20 +14,22 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+
 class CnpqParser:
     def __init__(self, max_items: Optional[int] = 50):
-        self.url = "http://memoria2.cnpq.br/web/guest/chamadas-publicas"
+        # O CNPq migrou do Liferay (memoria2.cnpq.br) para o portal gov.br.
+        self.url = "https://www.gov.br/cnpq/pt-br/chamadas/abertas-para-submissao"
         self.institution = "CNPq"
         self.max_items = max_items
 
     async def _goto_with_retry(
-        self, page, attempts: int = 3, base_delay: float = 1.0
+        self, page, attempts: int = 4, base_delay: float = 3.0
     ) -> None:
         last_exc = None
         for attempt in range(1, attempts + 1):
             try:
-                await page.goto(self.url, timeout=30000, wait_until="domcontentloaded")
-                await page.wait_for_selector("ol.list-chamadas li", timeout=20000)
+                await page.goto(self.url, timeout=45000, wait_until="domcontentloaded")
+                await page.wait_for_selector("#content div.item", timeout=25000)
                 return
             except Exception as exc:
                 last_exc = exc
@@ -51,55 +52,63 @@ class CnpqParser:
             page = await browser.new_page()
             await self._goto_with_retry(page)
 
-            items = await page.locator("ol.list-chamadas > li").all()
+            items = await page.locator("#content div.item").all()
 
             inserted_count = 0
             duplicate_count = 0
             error_count = 0
+            processed = 0
 
             iterable = items if item_limit is None else items[:item_limit]
             for item in iterable:
                 try:
-                    title_locator = item.locator("h4")
+                    title_locator = item.locator("h2.headline a")
                     if await title_locator.count() == 0:
                         continue
 
-                    title = await title_locator.inner_text()
-                    if not title.strip():
+                    title = (await title_locator.inner_text()).strip()
+                    if not title:
                         continue
 
-                    text_content = await item.inner_text()
-
-                    # Link: a página de detalhe é construída com o idDivulgacao
-                    # presente nos links de compartilhamento (a.facebook).
-                    link = ""
-                    share_url = await item.locator('a.facebook').first.get_attribute("href")
-                    m = re.search(r"idDivulgacao=(\d+)", urllib.parse.unquote(share_url or ""))
-                    if m:
-                        divulgacao_id = m.group(1)
-                        link = (
-                            "http://memoria2.cnpq.br/web/guest/chamadas-publicas?"
-                            "p_p_id=resultadosportlet_WAR_resultadoscnpqportlet_INSTANCE_0ZaM"
-                            "&filtro=abertas&detalha=chamadaDivulgada"
-                            f"&idDivulgacao={divulgacao_id}"
-                        )
-
+                    link = await title_locator.get_attribute("href")
                     if not link:
                         continue
 
-                    deadline = ""
-                    if "Inscrições:" in text_content or "Inscri\u00e7\u00f5es:" in text_content:
-                        dates = re.findall(r"(\d{2}/\d{2}/\d{4})", text_content)
-                        if len(dates) >= 2:
-                            deadline = dates[1]
-                        elif len(dates) == 1:
-                            deadline = dates[0]
+                    text_content = (await item.inner_text()).strip()
 
+                    # Data de publicação: "Publicado em DD/MM/AAAA HHhMM"
+                    pub_date = ""
+                    pub_loc = item.locator(".documentPublished .value")
+                    if await pub_loc.count() > 0:
+                        pub_raw = (await pub_loc.inner_text()).strip()
+                        m = re.search(r"(\d{2}/\d{2}/\d{4})", pub_raw)
+                        if m:
+                            d = m.group(1)
+                            pub_date = f"{d[6:]}-{d[3:5]}-{d[:2]}"
+
+                    # Prazo: "Inscrições: DD/MM/AAAA a DD/MM/AAAA" (ou INSCRIÇÕES:)
+                    deadline = ""
+                    m_insc = re.search(
+                        r"[Ii]nscri[çc][õo]es?:?\s*(\d{2}/\d{2}/\d{4})\s*a\s*(\d{2}/\d{2}/\d{4})",
+                        text_content,
+                    )
+                    if m_insc:
+                        deadline = m_insc.group(2)
+                    else:
+                        m_insc2 = re.search(
+                            r"[Ii]nscri[çc][õo]es?:?\s*(\d{2}/\d{2}/\d{4})",
+                            text_content,
+                        )
+                        if m_insc2:
+                            deadline = m_insc2.group(1)
+
+                    processed += 1
                     result = db.add_opportunity_with_result(
                         institution=self.institution,
-                        title=title.strip(),
+                        title=title,
                         link=link,
                         description=text_content[:200].strip().replace("\n", " ") + "...",
+                        pub_date=pub_date,
                         deadline=deadline,
                     )
                     if result == "inserted":
@@ -113,11 +122,12 @@ class CnpqParser:
             await browser.close()
             return {
                 "institution": self.institution,
-                "processed": len(iterable),
+                "processed": processed,
                 "new": inserted_count,
                 "duplicates": duplicate_count,
                 "errors": error_count,
             }
+
 
 if __name__ == "__main__":
     from crawler.database import OpportunityDatabase

@@ -98,13 +98,24 @@ class TestCnpqParser:
             mock_browser.new_page.return_value = mock_page
 
             mock_item = MagicMock()
-            h4_loc = _make_item_locator(count=1, inner_text="Test Edital CNPq")
-            link_loc = _make_item_locator(
-                count=1, get_attribute="https://example.com/edital"
+            title_loc = _make_item_locator(
+                count=1,
+                inner_text="Chamada CNPq nº 24/2026 - Teste",
+                get_attribute=(
+                    "https://www.gov.br/cnpq/pt-br/chamadas/todas-as-chamadas/"
+                    "chamada-no-24-2026/chamada-publica-cnpq-N-24-2026"
+                ),
             )
-            mock_item.locator = MagicMock(side_effect=[h4_loc, link_loc])
+            pub_loc = _make_item_locator(count=1, inner_text="03/08/2026 10h55")
+
+            def _loc_side_effect(sel):
+                if sel == "h2.headline a":
+                    return title_loc
+                return pub_loc
+
+            mock_item.locator = MagicMock(side_effect=_loc_side_effect)
             mock_item.inner_text = AsyncMock(
-                return_value="Inscrições: 01/01/2026 a 31/12/2026"
+                return_value="Inscrições: 03/08/2026 a 18/09/2026"
             )
 
             mock_page.locator = MagicMock(return_value=_make_page_locator(

@@ -2,25 +2,37 @@
 
 Scraper de editais de fomento à pesquisa (CAPES, CNPq, FINEP, FAPESB, SETEC, CONFAP, EMBRAPII, BNDES, MCTI).
 
-_Última atualização: 03/08/2026 (sessão foco: FAPESB, CNPq, FINEP, CAPES, SETEC-MEC)_
+_Última atualização: 03/08/2026 (sessão: dados de lançamento + CNPq no novo site)_
 
 ## Estado atual
 
-- Crawl completo: **03/08/2026** — **1244 registros** no `oportunidades.db`
+- Crawl completo: **03/08/2026** — **1253 registros** no `oportunidades.db`
 - Distribuição no banco:
-  - CAPES 654 · SETEC 495 · FINEP 36 · EMBRAPII 29 · FAPESB 18 · CONFAP 8 · BNDES 3 · CNPq 1
+  - CAPES 654 · SETEC 495 · FINEP 36 · EMBRAPII 29 · FAPESB 18 · CONFAP 8 · CNPq 10 · BNDES 3
   - **MCTI: 0** (parser corrigido, aguardando site liberar do CAPTCHA)
+- **302 registros com data de lançamento** (CNPq 10/10, FINEP 36/36, CAPES 256/654)
 - Todos os 29 testes passam (`python -m pytest`).
 
 ## Foco: FAPESB, CNPq, FINEP, CAPES, SETEC-MEC
 
 | Instituição | Registros | Estado | Última captura |
 |---|---|---|---|
-| CAPES | 654 | ✅ consistente (365 itens por crawl, 0 erros) | 03/08 |
-| SETEC | 495 | ✅ **reparado hoje** (era 0 por CAPTCHA + seletores quebrados) | 03/08 |
-| FINEP | 36 | ✅ consistente (API REST, 0 erros) | 03/08 |
-| FAPESB | 18 | ✅ consistente (0 erros) | 03/08 |
-| CNPq | 1 | ✅ funcional (só 1 chamada aberta hoje: PROAFRICA) | 03/08 |
+| CAPES | 654 | ✅ consistente; 256 com data de lançamento | 03/08 |
+| SETEC | 495 | ⏳ **a refazer** (ver pendências) | 03/08 |
+| FINEP | 36 | ✅ consistente; 36/36 com data | 03/08 |
+| FAPESB | 18 | ✅ consistente (sem datas — site não publica) | 03/08 |
+| CNPq | 10 | ✅ **migrado para o novo site** (gov.br) — 10/10 com data | 03/08 |
+
+## Sessão 03/08 (tarde) — dados de lançamento + CNPq novo
+
+- **Objetivo do usuário**: página com oportunidades recentes de financiamento p/ IFBA, com **data de lançamento** na planilha.
+- **Export**: coluna "Data de Lançamento" adicionada ao CSV/XLSX; HTML com coluna Lançamento, destaque de recentes (≤60 dias) e filtro 30/60/90 dias; ordenação por recência.
+- **CNPq migrou do Liferay para o portal gov.br**: `https://www.gov.br/cnpq/pt-br/chamadas/abertas-para-submissao`. Parser reescrito: 10 chamadas abertas com "Publicado em" (data) e "Inscrições" (prazo). Removida duplicata antiga (PROAFRICA via memoria2).
+- **FINEP**: data de publicação extraída da API (`dataDePublicacao`) — 36/36 preenchidos.
+- **CAPES**: site não expõe datas no HTML; extração via data no nome do arquivo SEI (`DDMMYYYY_...`) — 256/654. PDFs não são baixáveis direto (gov.br serve HTML).
+- **FAPESB/SETEC**: não publicam datas de lançamento (campos vazios na listagem e na página do edital).
+- **`add_opportunity_with_result`**: em caso de duplicata, preenche datas vazias do registro existente (UPDATE via COALESCE).
+- Teste do CNPq atualizado (mock por seletor).
 
 ### SETEC — reparo em 03/08
 
@@ -39,8 +51,10 @@ _Última atualização: 03/08/2026 (sessão foco: FAPESB, CNPq, FINEP, CAPES, SE
 
 ## Pendências
 
+- [ ] **SETEC — REFAZER** (URL: `gov.br/mec/pt-br/.../secretaria-de-educacao-profissional/editais`): os 495 registros atuais têm títulos inconsistentes (nomes de arquivo, anexos) e sem datas. Reavaliar escopo: focar em 2025-2026, melhorar títulos, buscar datas (páginas de ano têm "Atualizado em").
 - [ ] **MCTI**: CAPTCHA intermitente — parser corrigido aguardando o site liberar para validar.
-- [ ] **SETEC antigos**: títulos dos 151 registros SESU/UNESCO (16/06) são nomes de arquivo — melhorar se houver acesso.
+- [ ] **CAPES**: 398/654 sem data (nome de arquivo sem DDMMYYYY). Explorar extração do texto do PDF via navegador (gov.br serve HTML para httpx).
+- [ ] **FAPESB**: não publica datas — avaliar se o campo "LANÇAMENTO:" é preenchido em algum edital.
 - [ ] **Ruff/CI**: 116 erros de lint pré-existentes — decidir limpeza ou ajuste do CI.
 - [ ] `pyproject.toml` dependencies desatualizadas (faltam httpx/bs4; entry point `main` inexistente).
 

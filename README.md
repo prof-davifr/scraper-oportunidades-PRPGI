@@ -33,11 +33,22 @@ python crawler/main.py --parser capes|cnpq|finep|fapesb|setec|confap|embrapii|bn
 ## Saídas
 
 - `oportunidades.db` — banco SQLite (raiz do projeto)
-- `editais.csv` — CSV com BOM (`utf-8-sig`) para compatibilidade com Excel
-- `editais.xlsx` — planilha Excel
-- `editais.html` — página HTML standalone (responsiva, ordenável e filtrável)
+- `editais.csv` — CSV com BOM (`utf-8-sig`) para compatibilidade com Excel. Colunas: Instituição, Título, **Data de Lançamento**, Prazo, Link, Descrição — ordenado por recência.
+- `editais.xlsx` — planilha Excel (mesmas colunas)
+- `editais.html` — página HTML standalone (responsiva, ordenável e filtrável, com destaque para lançamentos recentes e filtro de últimos 30/60/90 dias)
 
 As planilhas são regeneradas apenas quando há novos registros.
+
+## Data de lançamento
+
+Os parsers preenchem `publication_date` (ISO `YYYY-MM-DD` no banco, exibida como DD/MM/AAAA):
+
+- **CNPq**: campo "Publicado em" da página de chamadas abertas (gov.br).
+- **FINEP**: campo `dataDePublicacao` da API REST.
+- **CAPES**: data embutida no nome do arquivo PDF (padrão SEI `DDMMYYYY_...`) — aproximação; a página não expõe a data.
+- **FAPESB/SETEC**: não publicam datas de lançamento — campo vazio.
+
+Registros já existentes têm datas vazias preenchidas automaticamente em execuções seguintes (UPDATE no dedup).
 
 ## Como funciona
 
@@ -45,7 +56,7 @@ As planilhas são regeneradas apenas quando há novos registros.
 - `crawler/database.py` — camada SQLite com deduplicação SHA256 em (título, link)
 - `crawler/parsers/` — um módulo por fonte:
   - **capes.py** — httpx + BeautifulSoup (sem Playwright). Busca a página de editais, extrai links de programas (`acoes-e-programas`) e PDFs diretos de editais.
-  - **cnpq.py** — Playwright em `memoria2.cnpq.br` (`ol.list-chamadas`); link de detalhe construído a partir do `idDivulgacao`.
+  - **cnpq.py** — Playwright no novo site do CNPq (`gov.br/cnpq/pt-br/chamadas/abertas-para-submissao`); extrai título, "Publicado em" (data de lançamento) e "Inscrições" (prazo).
   - **finep.py** — httpx REST API (`/o/c/chamadapublicas`), filtra `situacao.key == "aberta"`.
   - **fapesb.py, setec.py, mcti.py** — Playwright (portal gov.br e fapesb.ba.gov.br).
   - **confap.py** — Playwright em `news.confap.org.br/tag/editais/` (WordPress).

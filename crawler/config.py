@@ -62,7 +62,7 @@ class Settings:
             name="cnpq",
             module="crawler.parsers.cnpq",
             class_name="CnpqParser",
-            url="http://memoria2.cnpq.br/web/guest/chamadas-publicas",
+            url="https://www.gov.br/cnpq/pt-br/chamadas/abertas-para-submissao",
             description="Conselho Nacional de Desenvolvimento Científico e Tecnológico (CNPq)",
         ),
         Source(

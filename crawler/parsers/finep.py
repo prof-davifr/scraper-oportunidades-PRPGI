@@ -70,6 +70,17 @@ class FinepParser:
                 descricao = re.sub(r"<[^>]+>", "", descricao)
                 descricao = re.sub(r"\s+", " ", descricao).strip()
 
+                pub_date = ""
+                publicacao = item.get("dataDePublicacao") or item.get("dataPublicacao") or ""
+                if publicacao:
+                    try:
+                        dt = datetime.fromisoformat(str(publicacao).replace("Z", "+00:00"))
+                        pub_date = dt.strftime("%Y-%m-%d")
+                    except ValueError:
+                        m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", str(publicacao))
+                        if m:
+                            pub_date = m.group(0)
+
                 deadline = ""
                 prazo = item.get("prazoProposto", "")
                 if prazo:
@@ -84,6 +95,7 @@ class FinepParser:
                     title=title,
                     link=link,
                     description=descricao[:200].strip().replace("\n", " ") + "...",
+                    pub_date=pub_date,
                     deadline=deadline,
                 )
                 processed += 1
