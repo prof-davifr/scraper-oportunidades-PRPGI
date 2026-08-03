@@ -94,13 +94,6 @@ class Settings:
             description="Conselho Nacional das Fundações Estaduais de Amparo à Pesquisa (CONFAP)",
         ),
         Source(
-            name="embrapii",
-            module="crawler.parsers.embrapii",
-            class_name="EmbrapiiParser",
-            url="https://embrapii.org.br/editais-e-chamadas/",
-            description="Embrapii — Empresa Brasileira de Pesquisa e Inovação Industrial",
-        ),
-        Source(
             name="bndes",
             module="crawler.parsers.bndes",
             class_name="BndesParser",

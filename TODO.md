@@ -1,14 +1,14 @@
 # TODO — scraper-oportunidades-PRPGI
 
-Scraper de editais de fomento à pesquisa (CAPES, CNPq, FINEP, FAPESB, SETEC, CONFAP, EMBRAPII, BNDES, MCTI).
+Scraper de editais de fomento à pesquisa (CAPES, CNPq, FINEP, FAPESB, SETEC, CONFAP, BNDES, MCTI).
 
-_Última atualização: 03/08/2026 (sessão: dados de lançamento + CNPq no novo site)_
+_Última atualização: 03/08/2026 (sessão: dados de lançamento + CNPq no novo site + limpeza CAPES + consolidação de editais)_
 
 ## Estado atual
 
-- Crawl completo: **03/08/2026** — **1253 registros** no `oportunidades.db`
+- Crawl completo: **03/08/2026** — **561 registros** no `oportunidades.db` (EMBRAPII removida do sistema)
 - Distribuição no banco:
-  - CAPES 654 · SETEC 495 · FINEP 36 · EMBRAPII 29 · FAPESB 18 · CONFAP 8 · CNPq 10 · BNDES 3
+  - CAPES 433 · SETEC 53 · FINEP 36 · FAPESB 18 · CONFAP 8 · CNPq 10 · BNDES 3
   - **MCTI: 0** (parser corrigido, aguardando site liberar do CAPTCHA)
 - **302 registros com data de lançamento** (CNPq 10/10, FINEP 36/36, CAPES 256/654)
 - Todos os 29 testes passam (`python -m pytest`).
@@ -17,11 +17,44 @@ _Última atualização: 03/08/2026 (sessão: dados de lançamento + CNPq no novo
 
 | Instituição | Registros | Estado | Última captura |
 |---|---|---|---|
-| CAPES | 654 | ✅ consistente; 256 com data de lançamento | 03/08 |
-| SETEC | 495 | ⏳ **a refazer** (ver pendências) | 03/08 |
+| CAPES | 433 | ✅ consistente; **resultados/homologações de seleção removidos** | 03/08 |
+| SETEC | 53 | ✅ **refeito** — 53 editais agrupados com títulos limpos (era 495 PDFs avulsos) | 03/08 |
 | FINEP | 36 | ✅ consistente; 36/36 com data | 03/08 |
 | FAPESB | 18 | ✅ consistente (sem datas — site não publica) | 03/08 |
 | CNPq | 10 | ✅ **migrado para o novo site** (gov.br) — 10/10 com data | 03/08 |
+
+## Sessão 03/08 (tarde) — fix links FINEP
+
+- **Problema**: links das chamadas FINEP apontavam para o padrão antigo `finep.gov.br/oportunidades#!/chamada-publica/{id}`; o site atual usa `finep.gov.br/e/chamada-publica/{siteId}/{id}`.
+- **Parser** (`crawler/parsers/finep.py`): extrai o `siteId` do Liferay a partir da home (regex do template `href="/e/chamada-publica/{siteId}/${item.id}"`), com fallback `222684` (valor atual). Teste do link adicionado (17 testes de parser passando).
+- **Banco**: 36 links FINEP migrados para o novo formato (uid recalculado para manter o dedup); exports regenerados. Links validados (HTTP 200).
+
+## Sessão 03/08 (tarde) — remoção da EMBRAPII
+
+- **Decisão do usuário**: EMBRAPII fora do escopo do scraper.
+- Removidos: entrada do `SOURCES` (`crawler/config.py`), arquivo `crawler/parsers/embrapii.py`, testes do parser (46 passando), 29 registros do banco e menções em `README.md`, `fontes.md`, `AGENTS.md`.
+- Exports regenerados: 561 registros → **231 grupos** (consolidados).
+
+## Sessão 03/08 (tarde) — consolidação de editais
+
+- **Objetivo**: um edital aparecia várias vezes na lista (duplicatas do mesmo PDF em páginas de programa + atualizações: alteração, retificação, prorrogação, lista de inscritos).
+- **Novo módulo `crawler/consolidate.py`**: identifica o edital por instituição + tipo (edital, edital conjunto, chamada...) + número/ano, extrai o assunto e agrupa:
+  - deduplica títulos idênticos (mesmo doc em várias páginas);
+  - agrupa documentos relacionados sob o edital núcleo (o principal é o próprio edital, preferindo o com data mais antiga);
+  - separa colisões reais de número (ex.: "Edital nº 5/2026" PURDUE vs "Edital Conjunto nº 5/2026" OBEDUC);
+  - títulos sem número ficam sozinhos.
+- **Exports** (raiz): `editais.csv/xlsx` agora com colunas Instituição, Título, Data de Lançamento, Prazo, Link, **Documentos** (contagem) e **Documentos Relacionados** (título | link ; ...). `editais.html` ganhou coluna **Documentos** com seletor expansível (`<details>`) listando os relacionados. Contagem dos badges reflete grupos, não registros.
+- **Flag** `--no-consolidate` em `main.py` para exportar a lista completa.
+- **Banco**: 590 registros → **231 grupos** (59 com >1 documento) no momento da geração.
+- **Testes**: `tests/test_consolidate.py` (+19); 48 passando.
+- Obs.: crawl SETEC rodando em paralelo (outra sessão) alterou o banco durante a sessão — exports regenerados refletem o estado no momento da geração.
+
+## Sessão 03/08 (tarde) — limpeza de resultados CAPES
+
+- **Objetivo**: remover do CAPES os documentos que são apenas **resultados** de seleção (não são editais/oportunidades).
+- **Parser** (`crawler/parsers/capes.py`): `_ANNEX_KEYWORDS` ganhou `resultado` e `homologa` — filtra títulos como "Resultado final do Edital nº ...", "Resultado preliminar", "Retificação do Resultado", "Edital nº X - Resultado da Renovação de Projetos", "Lista de inscrições homologadas" etc.
+- **Banco**: 221 registros CAPES removidos (215 com "resultado" + 6 "Lista de inscrições homologadas") — CAPES 654 → 433; total 1253 → 1032.
+- Exports regenerados (`editais.csv`, `editais.xlsx`, `editais.html`).
 
 ## Sessão 03/08 (tarde) — dados de lançamento + CNPq novo
 
@@ -51,7 +84,12 @@ _Última atualização: 03/08/2026 (sessão: dados de lançamento + CNPq no novo
 
 ## Pendências
 
-- [ ] **SETEC — REFAZER** (URL: `gov.br/mec/pt-br/.../secretaria-de-educacao-profissional/editais`): os 495 registros atuais têm títulos inconsistentes (nomes de arquivo, anexos) e sem datas. Reavaliar escopo: focar em 2025-2026, melhorar títulos, buscar datas (páginas de ano têm "Atualizado em").
+- [x] **SETEC — REFAZIDO** (URL: `gov.br/mec/pt-br/.../secretaria-de-educacao-profissional/editais`):
+  - Parser reescrito: extrai **blocos de edital** (título `<p>` + lista de anexos `<ul>`) em vez de cada PDF como registro. 495 registros → **53 editais** com títulos completos e link do PDF principal.
+  - `_clean_title`: remove sufixos de navegação ("Acesse o edital", "accessibility-anchor"), anexos/resultados concatenados e duplicação de número — preservando títulos legítimos (ex.: "art. 13, Anexo I, do Decreto").
+  - Link principal: usa o link do PDF no título, senão o link "Edital"/"Chamada" da lista de anexos; ignora links de retificação/anexo/modelo.
+  - CAPTCHA intermitente do gov.br/MEC contornado com retry + detecção (6 tentativas, espera crescente).
+  - Obs.: SETEC não publica datas de lançamento — campo vazio.
 - [ ] **MCTI**: CAPTCHA intermitente — parser corrigido aguardando o site liberar para validar.
 - [ ] **CAPES**: 398/654 sem data (nome de arquivo sem DDMMYYYY). Explorar extração do texto do PDF via navegador (gov.br serve HTML para httpx).
 - [ ] **FAPESB**: não publica datas — avaliar se o campo "LANÇAMENTO:" é preenchido em algum edital.
@@ -85,8 +123,11 @@ _Última atualização: 03/08/2026 (sessão: dados de lançamento + CNPq no novo
 |---|---|---|
 | 16/06/2026 | todas | 647 registros; CNPq/BNDES/CAPES zerados; MCTI só ruído |
 | 03/08/2026 | todas | 1050 → 900 após limpeza MCTI; CAPES 365, CNPq 1, BNDES 3; SETEC/MCTI bloqueados por CAPTCHA |
+| 03/08/2026 | CAPES | 221 resultados de seleção removidos (CAPES 654 → 433; total 1253 → 1032) |
+| 03/08/2026 | exports | Consolidação: 590 registros → 231 grupos (59 multi-documento) |
+| 03/08/2026 | FINEP | 36 links migrados para /e/chamada-publica/{siteId}/{id} (antes oportunidades#!/...) |
 
 ## Fonte de referência
 
 - Guia de fontes: `fontes.md`
-- Fontes registradas em `crawler/config.py` (ordem: CAPES, CNPq, FINEP, FAPESB, SETEC, CONFAP, EMBRAPII, BNDES, MCTI)
+- Fontes registradas em `crawler/config.py` (ordem: CAPES, CNPq, FINEP, FAPESB, SETEC, CONFAP, BNDES, MCTI)

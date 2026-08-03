@@ -15,13 +15,34 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 class FinepParser:
+    # siteId do Liferay da FINEP, usado nas URLs públicas de chamada:
+    # https://www.finep.gov.br/e/chamada-publica/{siteId}/{chamadaId}
+    # Extraído da home quando possível; este é o valor atual (constante no template do site).
+    _SITE_ID_FALLBACK = "222684"
+    # A home expõe o template: href="/e/chamada-publica/{siteId}/${{item.id}}"
+    _SITE_ID_RE = re.compile(r'/e/[a-z0-9-]+/(\d+)/\$\{item\.id\}')
+
     def __init__(self, max_items: Optional[int] = 50):
+        self.home_url = "https://www.finep.gov.br/"
         self.api_url = (
             "https://www.finep.gov.br/o/c/chamadapublicas"
             "?sort=dataDePublicacao:desc&pageSize=250"
         )
         self.institution = "FINEP"
         self.max_items = max_items
+
+    async def _fetch_site_id(self, client) -> str:
+        """Descobre o siteId do Liferay a partir da home (auto-recuperável)."""
+        try:
+            r = await client.get(self.home_url, timeout=30)
+            text = r.text
+            if isinstance(text, str):
+                m = self._SITE_ID_RE.search(text)
+                if m:
+                    return m.group(1)
+        except Exception:
+            logger.exception("Falha ao extrair siteId da home FINEP")
+        return self._SITE_ID_FALLBACK
 
     async def parse(self, db, max_items: Optional[int] = None) -> Dict[str, Any]:
         import httpx
@@ -34,6 +55,7 @@ class FinepParser:
 
         try:
             async with httpx.AsyncClient(timeout=30) as client:
+                site_id = await self._fetch_site_id(client)
                 response = await client.get(
                     self.api_url,
                     headers={"Accept": "application/json"},
@@ -64,7 +86,7 @@ class FinepParser:
                 title = title.strip()
 
                 chamada_id = item.get("id")
-                link = f"https://www.finep.gov.br/oportunidades#!/chamada-publica/{chamada_id}"
+                link = f"https://www.finep.gov.br/e/chamada-publica/{site_id}/{chamada_id}"
 
                 descricao = item.get("descricaoRawText") or item.get("descricao", "")
                 descricao = re.sub(r"<[^>]+>", "", descricao)

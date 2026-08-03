@@ -50,6 +50,7 @@ async def run_crawler(
     selected_parser: str = "all",
     max_items: Optional[int] = None,
     settings: Optional[Settings] = None,
+    no_consolidate: bool = False,
 ) -> None:
     if settings is None:
         settings = Settings()
@@ -102,12 +103,12 @@ async def run_crawler(
     if should_export:
         logger.info("Exporting to spreadsheet...")
         exported_csv, exported_xlsx = db.export_to_spreadsheet(
-            settings.csv_path, settings.xlsx_path
+            settings.csv_path, settings.xlsx_path, consolidate=not no_consolidate
         )
         logger.info("Spreadsheets updated: %s, %s", exported_csv, exported_xlsx)
 
         logger.info("Exporting to HTML...")
-        exported_html = db.export_to_html(settings.html_path)
+        exported_html = db.export_to_html(settings.html_path, consolidate=not no_consolidate)
         logger.info("HTML updated: %s", exported_html)
     else:
         logger.info("No new opportunities found; keeping existing exports.")
@@ -150,6 +151,11 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         type=int,
         default=None,
         help="Optional maximum number of page items to process per parser.",
+    )
+    parser.add_argument(
+        "--no-consolidate",
+        action="store_true",
+        help="Export sem consolidação (uma linha por documento, incluindo duplicatas e atualizações).",
     )
     parser.add_argument(
         "--db-path",
@@ -205,5 +211,6 @@ if __name__ == "__main__":
             selected_parser=args.parser,
             max_items=args.max_items,
             settings=settings,
+            no_consolidate=args.no_consolidate,
         )
     )

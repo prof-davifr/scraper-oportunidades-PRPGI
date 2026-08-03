@@ -74,6 +74,13 @@ class TestFinepParser:
         assert result["new"] == 2
         assert result["processed"] == 2
         assert result["errors"] == 0
+        # links no formato atual: /e/chamada-publica/{siteId}/{id}
+        calls = [c for c in mock_db.add_opportunity_with_result.call_args_list]
+        links = [c.kwargs["link"] for c in calls]
+        assert links == [
+            "https://www.finep.gov.br/e/chamada-publica/222684/123",
+            "https://www.finep.gov.br/e/chamada-publica/222684/456",
+        ]
         assert "institution" in result
         assert "processed" in result
         assert "new" in result
@@ -272,57 +279,6 @@ class TestConfapParser:
                 await parser._goto_with_retry(mock_page)
 
 
-# ---- EmbrapiiParser tests ----
-class TestEmbrapiiParser:
-    @pytest.mark.asyncio
-    async def test_parse_returns_expected_keys(self):
-        from crawler.parsers.embrapii import EmbrapiiParser
-
-        parser = EmbrapiiParser(max_items=5)
-        mock_db = MagicMock()
-        mock_db.add_opportunity_with_result.return_value = "inserted"
-
-        with patch("crawler.parsers.embrapii.async_playwright") as mock_pw:
-            mock_page = AsyncMock()
-            mock_browser = AsyncMock()
-            mock_pw.return_value.__aenter__.return_value.chromium.launch.return_value = mock_browser
-            mock_browser.new_page.return_value = mock_page
-
-            def make_link(text: str, href: str) -> MagicMock:
-                link = MagicMock()
-                link.text_content = AsyncMock(return_value=text)
-                link.get_attribute = AsyncMock(return_value=href)
-                return link
-
-            mock_page.locator = MagicMock(return_value=_make_page_locator([
-                make_link("Chamada Publica 01/2026", "https://embrapii.org.br/chamadas-publicas/chamada-01-2026/"),
-                make_link("Ver documentos", "https://embrapii.org.br/chamadas-publicas/chamada-01-2026/"),
-                make_link("Chamada Publica 02/2026", "/chamadas-publicas/chamada-02-2026/"),
-            ]))
-
-            result = await parser.parse(mock_db)
-
-        assert result["institution"] == "EMBRAPII"
-        assert result["processed"] == 2  # "Ver documentos" filtered out
-        assert result["errors"] == 0
-
-    @pytest.mark.asyncio
-    async def test_goto_with_retry_raises_after_max_attempts(self):
-        from crawler.parsers.embrapii import EmbrapiiParser
-
-        parser = EmbrapiiParser()
-
-        with patch("crawler.parsers.embrapii.async_playwright") as mock_pw:
-            mock_page = AsyncMock()
-            mock_browser = AsyncMock()
-            mock_pw.return_value.__aenter__.return_value.chromium.launch.return_value = mock_browser
-            mock_browser.new_page.return_value = mock_page
-            mock_page.goto = AsyncMock(side_effect=RuntimeError("Connection refused"))
-
-            with pytest.raises(RuntimeError, match="EMBRAPII navigation failed after 3 attempts"):
-                await parser._goto_with_retry(mock_page)
-
-
 # ---- BndesParser tests ----
 class TestBndesParser:
     @pytest.mark.asyncio
@@ -511,10 +467,9 @@ class TestConfig:
         assert "fapesb" in s.source_names()
         assert "setec" in s.source_names()
         assert "confap" in s.source_names()
-        assert "embrapii" in s.source_names()
         assert "bndes" in s.source_names()
         assert "mcti" in s.source_names()
-        assert len(s.source_names()) == 9
+        assert len(s.source_names()) == 8
 
     def test_get_source_find(self):
         from crawler.config import Settings

@@ -1,6 +1,6 @@
 # scraper-oportunidades-PRPGI
 
-Web scraper para editais de fomento à pesquisa brasileiros. Coleta de **CAPES, CNPq, FINEP, FAPESB, SETEC, CONFAP, EMBRAPII, BNDES, MCTI**, armazena em SQLite e exporta para CSV/Excel/HTML.
+Web scraper para editais de fomento à pesquisa brasileiros. Coleta de **CAPES, CNPq, FINEP, FAPESB, SETEC, CONFAP, BNDES, MCTI**, armazena em SQLite e exporta para CSV/Excel/HTML.
 
 ## Pré-requisitos
 
@@ -27,7 +27,7 @@ python crawler/parsers/cnpq.py
 Filtros opcionais:
 
 ```bash
-python crawler/main.py --parser capes|cnpq|finep|fapesb|setec|confap|embrapii|bndes|mcti|all --max-items N
+python crawler/main.py --parser capes|cnpq|finep|fapesb|setec|confap|bndes|mcti|all --max-items N
 ```
 
 ## Saídas
@@ -60,7 +60,6 @@ Registros já existentes têm datas vazias preenchidas automaticamente em execu�
   - **finep.py** — httpx REST API (`/o/c/chamadapublicas`), filtra `situacao.key == "aberta"`.
   - **fapesb.py, setec.py, mcti.py** — Playwright (portal gov.br e fapesb.ba.gov.br).
   - **confap.py** — Playwright em `news.confap.org.br/tag/editais/` (WordPress).
-  - **embrapii.py** — Playwright em `/transparencia/` (WordPress), links `a[href*="chamadas-publicas"]`.
   - **bndes.py** — Playwright na home (`bndes.gov.br`); captura cards de destaque de editais/chamadas/seleções (a página antiga de chamadas públicas retorna 404).
 
 Parsers usam retry com backoff exponencial e isolam falhas por item.

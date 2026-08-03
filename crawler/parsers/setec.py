@@ -19,6 +19,15 @@ STEALTH_JS = """
 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
 """
 
+# Palavras que identificam o título de um edital/chamada
+_EDITAL_KEYWORDS = ("edital", "chamada", "chamamento", "seleção", "selecao",
+                    "termo de referência", "tr nº", "processo seletivo")
+
+# Palavras de anexos/documentos que NÃO são o edital em si
+_ANNEX_KEYWORDS = ("anexo", "modelo", "formulário", "formulario", "termo de autorização",
+                   "termo de compromisso", "plano de trabalho", "carta de anuência",
+                   "declaração", "declaracao", "comprovante", "solicitação", "solicitacao")
+
 
 async def _create_stealth_context(browser):
     context = await browser.new_context(
@@ -34,7 +43,7 @@ async def _create_stealth_context(browser):
 
 
 class SetecParser:
-    def __init__(self, max_items: int | None = 50):
+    def __init__(self, max_items: int | None = 200):
         self.base_url = "https://www.gov.br/mec/pt-br/acesso-a-informacao/institucional/estrutura-organizacional/orgaos-especificos-singulares/secretaria-de-educacao-profissional/editais"
         self.institution = "SETEC"
         self.max_items = max_items
@@ -71,11 +80,9 @@ class SetecParser:
         raise RuntimeError(f"SETEC navigation failed after {attempts} attempts") from last_exc
 
     async def _get_year_links(self, page) -> list[str]:
-        # A estrutura mudou: os links de ano ficam sob o caminho da secretaria
-        # (antes eram /centrais-de-conteudo/editais/).
+        # Links de ano ficam sob o caminho da secretaria (ex.: .../editais/2026)
         links = await page.locator(
-            'a[href*="/editais/202"], '
-            'a[href*="/editais/anterior-a-2021"]'
+            'a[href*="/editais/202"], a[href*="/editais/anterior-a-2021"]'
         ).all()
         seen = set()
         result = []
@@ -86,66 +93,140 @@ class SetecParser:
                 result.append(href)
         return result
 
-    async def _scrape_year_page(
-        self, context, year_url: str, item_limit: int | None
-    ) -> list[dict]:
-        page = await context.new_page()
-        try:
-            await self._goto_with_retry(page, year_url)
+    async def _extract_edital_blocks(self, page) -> list[dict]:
+        """Extrai blocos de edital da página de ano.
 
-            # Editais agora são links .pdf diretos (ex.: SEI_6991254_chamada.pdf)
-            pdf_links = await page.locator('#content a[href*=".pdf"]').all()
-            items = []
-            seen_hrefs = set()
+        Cada edital é um <p> (título, às vezes com link do PDF embutido)
+        seguido de uma <ul> com anexos/documentos. Retorna um dict por
+        edital com título real e link principal (PDF do edital)."""
+        return await page.evaluate("""() => {
+            const out = [];
+            const container = document.getElementById('parent-fieldname-text')
+                || document.getElementById('content');
+            if (!container) return out;
 
-            for link in pdf_links:
-                if item_limit is not None and len(items) >= item_limit:
-                    break
+            let current = null;
+            const isPdf = h => /\\.pdf(\\.|$)|\\/pdf\\//i.test(h || '');
+            const isEdital = t => /edital|chamada|chamamento|sele[çc][ãa]o|termo de refer[êe]ncia|processo seletivo/i.test(t || '');
 
-                href = await link.get_attribute("href")
-                if not href or href in seen_hrefs:
-                    continue
-                seen_hrefs.add(href)
+            for (const el of container.children) {
+                if (el.tagName === 'P') {
+                    // novo bloco candidato
+                    current = {
+                        title: el.textContent.trim(),
+                        primaryLink: '',
+                        primaryText: '',
+                        links: []
+                    };
+                    const a = el.querySelector('a[href]');
+                    if (a && (isPdf(a.href) || isEdital(a.textContent))) {
+                        current.primaryLink = a.href;
+                        current.primaryText = a.textContent.trim();
+                    }
+                    out.push(current);
+                } else if (el.tagName === 'UL' && current) {
+                    for (const li of el.querySelectorAll('li')) {
+                        const a = li.querySelector('a[href]');
+                        if (!a) continue;
+                        const text = li.textContent.trim();
+                        current.links.push({ text: text, href: a.href });
+                    }
+                }
+            }
+            return out;
+        }""")
 
-                link_text = (await link.text_content() or "").strip()
-                # Título vago ("Edital", "Retificação", "(documento Nº ...)"):
-                # usa o texto do item pai (li/div) para dar contexto.
-                if (
-                    not link_text
-                    or len(link_text) < 12
-                    or link_text.lower().startswith("(")
-                ):
-                    parent = link.locator("xpath=ancestor::li[1] | ancestor::div[1]")
-                    parent_text = ""
-                    try:
-                        parent_text = (await parent.first.inner_text() or "").strip()
-                    except Exception:
-                        parent_text = ""
-                    if parent_text:
-                        title = parent_text.split("\n")[0].strip()[:200]
-                    else:
-                        title = href.rsplit("/", 1)[-1].replace(".pdf", "").replace("-", " ").replace("_", " ").title()
-                else:
-                    title = link_text
+    def _pick_edital(self, block: dict) -> dict | None:
+        """Decide se o bloco é um edital e qual link usar."""
+        title = self._clean_title(block.get("title", ""))
+        if not title:
+            return None
+        low = title.lower()
 
-                if not title:
-                    continue
+        # Só considera blocos que parecem editais
+        if not any(kw in low for kw in _EDITAL_KEYWORDS):
+            return None
+        # Título que começa com "Acesse/Clique" é link de documento, não edital
+        if re.match(r"^(acesse|clique|baixe)\b", low):
+            return None
 
-                # Exclui documentos de apoio (anexos/modelos) — não são editais.
-                low = title.lower()
-                if any(kw in low for kw in ("anexo", "modelo do formulário", "modelo de formulário", "termo de autorização")):
-                    continue
+        # Nomes de arquivo que indicam documento de apoio (não o edital)
+        def _is_support_link(href: str) -> bool:
+            fname = (href or "").lower().split("/")[-1]
+            return any(
+                kw in fname
+                for kw in ("retifica", "anexo", "_modelo", "formulario", "formulário",
+                           "declaracao", "termo", "planodetrabalho", "plano_de_trabalho")
+            )
 
-                items.append({
-                    "title": title,
-                    "link": href,
-                    "deadline": "",
-                    "description": title,
-                })
+        links = block.get("links", [])
 
-            return items
-        finally:
-            await page.close()
+        def _primary():
+            link = block.get("primaryLink", "") or ""
+            if link and not _is_support_link(link):
+                return link
+            # link "Edital"/"Chamada" na lista de anexos
+            for item in links:
+                t = item.get("text", "").lower()
+                if re.match(r"^(edital|chamada|chamamento)", t):
+                    return item["href"]
+            # primeiro link PDF que não seja documento de apoio
+            for item in links:
+                h = item.get("href", "")
+                if re.search(r"\.pdf", h, re.IGNORECASE) and not _is_support_link(h):
+                    return h
+            return ""
+
+        link = _primary()
+        if not link:
+            return None
+
+        return {"title": title, "link": link}
+
+    @staticmethod
+    def _clean_title(raw: str) -> str:
+        """Normaliza e corta o título do edital, removendo texto de itens
+        seguintes (anexos, resultados) concatenados via textContent."""
+        title = re.sub(r"\s+", " ", raw or "").strip()
+        if not title:
+            return ""
+
+        # 1) Remove duplicação "Edital nº X ... Edital nº X ...": mantém até a
+        # 2ª ocorrência do marcador de edital (texto de blocos concatenados)
+        marks = [
+            mm.start()
+            for mm in re.finditer(
+                r"(?i)(?:edital\s+n[º°]?\s*\d+|chamada\s+p[úu]blica\s*n[º°]?\s*\d+|chamada\s+n[º°]?\s*\d+)",
+                title,
+            )
+        ]
+        if len(marks) >= 2:
+            title = title[: marks[1]].strip()
+
+        # 2) Corta em itens de lista concatenados: "Anexo X - ...",
+        # "Resultado (Preliminar/Final/...) ..." (podem vir colados ao título)
+        m = re.search(
+            r"(?i)(?:anexo\s+[ivx\d]+\s*[-–]|resultado\s+(?:preliminar|final|parcial))",
+            title,
+        )
+        if m and m.start() > 25:
+            title = title[: m.start()].strip()
+
+        # 3) Remove sufixos de navegação/a11y (pode ser repetido: "Acesse o Edital Acesse o")
+        for _ in range(2):
+            title = re.sub(
+                r"(?i)\s*(?:acesse\s+o\s+edital\.?|acesse\s+o\s+documento\.?|acesse\s+o\.?|clique\s+aqui\.?|baixar\s+o\s+edital\.?)\s*$",
+                "",
+                title,
+            ).strip()
+            title = re.sub(r"(?i)\s*acesse\s+o\s*$", "", title).strip()
+        title = re.sub(r"(?i)\s*accessibility-anchor\s*", "", title).strip()
+        # remove separador residual antes de sufixo cortado ("- " solto)
+        title = re.sub(r"\s*[-–]\s*$", "", title).strip()
+
+        # Remove "Anexo I" / "Anexo II" residuais no fim
+        title = re.sub(r"(?i)\s*[-–:]?\s*(?:anexo\s+[ivx\d]+)\s*$", "", title).strip()
+        return title
 
     async def parse(self, db, max_items: int | None = None) -> dict[str, Any]:
         item_limit = self.max_items if max_items is None else max_items
@@ -173,20 +254,32 @@ class SetecParser:
                     if item_limit is not None and processed >= item_limit:
                         break
 
-                    items = await self._scrape_year_page(context, year_url, item_limit)
+                    year_page = await context.new_page()
+                    try:
+                        await self._goto_with_retry(year_page, year_url)
+                        blocks = await self._extract_edital_blocks(year_page)
+                    except Exception as e:
+                        error_count += 1
+                        logger.exception("Error scraping SETEC year page %s: %s", year_url, e)
+                        await year_page.close()
+                        continue
+                    await year_page.close()
 
-                    for item in items:
+                    for block in blocks:
                         if item_limit is not None and processed >= item_limit:
                             break
+                        edital = self._pick_edital(block)
+                        if not edital:
+                            continue
+                        processed += 1
                         try:
                             result = db.add_opportunity_with_result(
                                 institution=self.institution,
-                                title=item["title"],
-                                link=item["link"],
-                                description=item["description"],
-                                deadline=item["deadline"],
+                                title=edital["title"],
+                                link=edital["link"],
+                                description=edital["title"],
+                                deadline="",
                             )
-                            processed += 1
                             if result == "inserted":
                                 inserted_count += 1
                             else:

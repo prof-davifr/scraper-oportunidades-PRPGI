@@ -138,81 +138,185 @@ class OpportunityDatabase:
             return f"{m.group(3)}/{m.group(2)}/{m.group(1)}"
         return s
 
+    def _fetch_all_rows(self) -> List[Dict]:
+        """Todos os registros como lista de dicts (para consolidação)."""
+        with sqlite3.connect(self.db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT id, institution, title, description, link,
+                       publication_date, deadline
+                FROM opportunities
+                """
+            )
+            cols = [d[0] for d in cur.description]
+            return [dict(zip(cols, row)) for row in cur.fetchall()]
+
     def export_to_spreadsheet(
-        self, csv_path: str = "editais.csv", xlsx_path: str = "editais.xlsx"
+        self,
+        csv_path: str = "editais.csv",
+        xlsx_path: str = "editais.xlsx",
+        consolidate: bool = True,
     ) -> Tuple[str, str]:
         """Export all opportunities to CSV and Excel.
+
+        Args:
+            consolidate: quando True, agrupa documentos do mesmo edital
+                (atualizações, resultados, duplicatas) em uma única linha,
+                com a lista de documentos relacionados.
 
         CSV is written as UTF-8 with BOM for Excel compatibility.
         Export ordering is deterministic (institution/title/link/id).
         """
-        with sqlite3.connect(self.db_path) as conn:
-            df = pd.read_sql_query(
-                """
-                SELECT
-                    institution as Instituição,
-                    title as Título,
-                    publication_date as "Data de Lançamento",
-                    deadline as Prazo,
-                    link as Link,
-                    description as Descrição
-                FROM opportunities
-                ORDER BY
-                    CASE WHEN publication_date IS NULL OR publication_date = '' THEN 1 ELSE 0 END,
-                    publication_date DESC,
-                    institution ASC, title ASC, link ASC, id ASC
-                """,
-                conn,
-            )
-            # Data de lançamento em ISO (YYYY-MM-DD) -> DD/MM/YYYY para exibição
-            if "Data de Lançamento" in df.columns:
-                df["Data de Lançamento"] = df["Data de Lançamento"].apply(
-                    lambda v: self._format_date(v)
+        if consolidate:
+            from crawler.consolidate import consolidate_editais
+
+            groups = consolidate_editais(self._fetch_all_rows())
+            data = []
+            for g in groups:
+                related_text = " ; ".join(
+                    f"{r['title']} | {r['link']}" for r in g["related"]
                 )
+                data.append(
+                    {
+                        "Instituição": g["institution"],
+                        "Título": g["title"],
+                        "Data de Lançamento": self._format_date(g["publication_date"]),
+                        "Prazo": self._format_date(g["deadline"]),
+                        "Link": g["link"],
+                        "Documentos": g["docs_count"],
+                        "Documentos Relacionados": related_text,
+                    }
+                )
+            df = pd.DataFrame(data)
+        else:
+            with sqlite3.connect(self.db_path) as conn:
+                df = pd.read_sql_query(
+                    """
+                    SELECT
+                        institution as Instituição,
+                        title as Título,
+                        publication_date as "Data de Lançamento",
+                        deadline as Prazo,
+                        link as Link,
+                        description as Descrição
+                    FROM opportunities
+                    ORDER BY
+                        CASE WHEN publication_date IS NULL OR publication_date = '' THEN 1 ELSE 0 END,
+                        publication_date DESC,
+                        institution ASC, title ASC, link ASC, id ASC
+                    """,
+                    conn,
+                )
+                # Data de lançamento em ISO (YYYY-MM-DD) -> DD/MM/YYYY para exibição
+                if "Data de Lançamento" in df.columns:
+                    df["Data de Lançamento"] = df["Data de Lançamento"].apply(
+                        lambda v: self._format_date(v)
+                    )
 
         df.to_csv(csv_path, index=False, encoding="utf-8-sig")
         df.to_excel(xlsx_path, index=False)
         return csv_path, xlsx_path
 
-    def export_to_html(self, html_path: str = "editais.html") -> str:
-        """Export all opportunities to a standalone HTML page."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT institution, title, publication_date, deadline, link, description
-                FROM opportunities
-                ORDER BY
-                    CASE WHEN publication_date IS NULL OR publication_date = '' THEN 1 ELSE 0 END,
-                    publication_date DESC,
-                    institution ASC, title ASC, link ASC, id ASC
-            """)
-            rows = cursor.fetchall()
+    def export_to_html(
+        self, html_path: str = "editais.html", consolidate: bool = True
+    ) -> str:
+        """Export all opportunities to a standalone HTML page.
 
-        totals = self.get_totals_by_institution()
-        total_count = sum(totals.values())
+        Args:
+            consolidate: quando True, agrupa documentos do mesmo edital em uma
+                única linha, com os documentos relacionados em um seletor
+                expansível (coluna "Documentos").
+        """
+        if consolidate:
+            from crawler.consolidate import consolidate_editais
 
-        rows_html = ""
-        for inst, title, pub_date, deadline, link, desc in rows:
-            safe_title = title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            safe_desc = (desc or "")[:300].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            safe_deadline = self._format_date(deadline) or "—"
-            safe_pub = self._format_date(pub_date) or "—"
-            # destaque para lançamentos recentes (últimos 60 dias)
-            recent = ""
-            if pub_date:
-                try:
-                    import datetime as _dt
-                    pub_dt = _dt.date.fromisoformat(str(pub_date)[:10])
-                    if (_dt.date.today() - pub_dt).days <= 60:
-                        recent = ' class="recent"'
-                except ValueError:
-                    pass
-            rows_html += f"""<tr{recent}>
+            groups = consolidate_editais(self._fetch_all_rows())
+            totals: Dict[str, int] = {}
+            for g in groups:
+                totals[g["institution"]] = totals.get(g["institution"], 0) + 1
+            total_count = sum(totals.values())
+
+            rows_html = ""
+            for g in groups:
+                inst = g["institution"]
+                title = g["title"]
+                link = g["link"]
+                desc = g["description"]
+                pub_date = g["latest_date"] or g["publication_date"]
+                deadline = g["deadline"]
+                safe_title = title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                safe_desc = (desc or "")[:300].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                safe_deadline = self._format_date(deadline) or "—"
+                safe_pub = self._format_date(pub_date) or "—"
+                recent = ""
+                if pub_date:
+                    try:
+                        import datetime as _dt
+                        pub_dt = _dt.date.fromisoformat(str(pub_date)[:10])
+                        if (_dt.date.today() - pub_dt).days <= 60:
+                            recent = ' class="recent"'
+                    except ValueError:
+                        pass
+                if g["related"]:
+                    docs_items = "".join(
+                        f"""<li><a href="{r['link']}" target="_blank" rel="noopener">{r['title'].replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')}</a> <span class="docdate">({self._format_date(r['publication_date']) or '—'})</span></li>"""
+                        for r in g["related"]
+                    )
+                    docs_cell = (
+                        f"<details class=\"docs\"><summary>{len(g['related'])} relacionado(s)</summary>"
+                        f"<ul>{docs_items}</ul></details>"
+                    )
+                else:
+                    docs_cell = "—"
+                rows_html += f"""<tr{recent}>
                 <td class="inst">{inst}</td>
                 <td class="title"><a href="{link}" target="_blank" rel="noopener">{safe_title}</a></td>
                 <td class="pub">{safe_pub}</td>
                 <td class="deadline">{safe_deadline}</td>
                 <td class="desc">{safe_desc}</td>
+                <td class="docs">{docs_cell}</td>
+            </tr>
+"""
+        else:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT institution, title, publication_date, deadline, link, description
+                    FROM opportunities
+                    ORDER BY
+                        CASE WHEN publication_date IS NULL OR publication_date = '' THEN 1 ELSE 0 END,
+                        publication_date DESC,
+                        institution ASC, title ASC, link ASC, id ASC
+                """)
+                rows = cursor.fetchall()
+
+            totals = self.get_totals_by_institution()
+            total_count = sum(totals.values())
+
+            rows_html = ""
+            for inst, title, pub_date, deadline, link, desc in rows:
+                safe_title = title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                safe_desc = (desc or "")[:300].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                safe_deadline = self._format_date(deadline) or "—"
+                safe_pub = self._format_date(pub_date) or "—"
+                # destaque para lançamentos recentes (últimos 60 dias)
+                recent = ""
+                if pub_date:
+                    try:
+                        import datetime as _dt
+                        pub_dt = _dt.date.fromisoformat(str(pub_date)[:10])
+                        if (_dt.date.today() - pub_dt).days <= 60:
+                            recent = ' class="recent"'
+                    except ValueError:
+                        pass
+                rows_html += f"""<tr{recent}>
+                <td class="inst">{inst}</td>
+                <td class="title"><a href="{link}" target="_blank" rel="noopener">{safe_title}</a></td>
+                <td class="pub">{safe_pub}</td>
+                <td class="deadline">{safe_deadline}</td>
+                <td class="desc">{safe_desc}</td>
+                <td class="docs">—</td>
             </tr>
 """
 
@@ -263,6 +367,17 @@ class OpportunityDatabase:
   .pub {{ white-space: nowrap; color: #333; font-variant-numeric: tabular-nums; }}
   .deadline {{ white-space: nowrap; color: #666; }}
   .desc {{ color: #555; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+  .docs {{ white-space: nowrap; color: #666; }}
+  .docs details {{ position: relative; }}
+  .docs summary {{ cursor: pointer; color: #165c33; font-weight: 600; user-select: none; }}
+  .docs details[open] summary {{ margin-bottom: .25rem; }}
+  .docs ul {{ position: absolute; z-index: 5; left: 0; top: 100%; min-width: 420px; max-width: 640px;
+             background: #fff; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.15);
+             list-style: none; padding: .5rem .75rem; margin: 0; white-space: normal; font-size: .8rem; }}
+  .docs li {{ margin: .3rem 0; }}
+  .docs li a {{ color: #1a73e8; text-decoration: none; word-break: break-word; }}
+  .docs li a:hover {{ text-decoration: underline; }}
+  .docs .docdate {{ color: #888; font-size: .75rem; white-space: nowrap; }}
   tr.recent {{ background: #eef7ef; }}
   tr.recent td.pub::after {{ content: " • novo"; color: #00853f; font-weight: 600; font-size: .72rem; }}
   .empty {{ text-align: center; padding: 3rem 1rem; color: #888; }}
@@ -305,6 +420,7 @@ class OpportunityDatabase:
           <th onclick="sortTable(2)">Lançamento</th>
           <th onclick="sortTable(3)">Prazo</th>
           <th onclick="sortTable(4)">Descrição</th>
+          <th>Documentos</th>
         </tr>
       </thead>
       <tbody>{rows_html}</tbody>

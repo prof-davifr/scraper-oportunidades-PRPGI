@@ -10,7 +10,6 @@ Guia de links para busca de oportunidades de fomento, bolsas e editais de pesqui
 | **Federal** | FINEP | Chamadas Abertas - Inovação e Infraestrutura | [Acessar Oportunidades](https://www.finep.gov.br/oportunidades) |
 | **Federal** | CAPES | Pós-Graduação, Editais e Bolsas | [Acessar Editais](https://www.gov.br/capes/pt-br/assuntos/editais-e-resultados-capes) |
 | **Federal** | MCTI | Painel de Editais - Governo Federal | [Acessar Painel](https://www.gov.br/mcti/pt-br/acesso-a-informacao/editais) |
-| **Inovação** | EMBRAPII | Inovação Industrial (Empresa + Pesquisa) | [Acessar Chamadas](https://embrapii.org.br/transparencia/) |
 | **Inovação** | BNDES | Projetos Estratégicos - Chamadas e Seleções | [Acessar Chamadas](https://www.bndes.gov.br/wps/portal/site/home/financiamento/agentes-financeiros-credenciados/chamadas-publicas) |
 | **Inovação** | SEBRAE | Editais Nacionais - Consultoria e Inovação | [Acessar Editais](https://sebrae.com.br/sites/PortalSebrae/editais) |
 | **Tecnologia/Redes** | RNP | Pesquisa e Redes - Grupos de Trabalho | [Acessar Chamadas](https://www.rnp.br/inovacao/editais-de-pesquisa-e-desenvolvimento) |

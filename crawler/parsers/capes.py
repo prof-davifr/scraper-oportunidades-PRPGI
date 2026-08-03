@@ -19,7 +19,12 @@ if str(PROJECT_ROOT) not in sys.path:
 _MAIN_URL = "https://www.gov.br/capes/pt-br/assuntos/editais-e-resultados-capes"
 _HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"}
 
-_ANNEX_KEYWORDS = {"anexo", "termo", "declara", "modelo", "comunicado", "portaria"}
+# Palavras que indicam que o PDF NÃO é o edital em si (anexos, modelos,
+# comunicados, resultados/homologações de seleção etc.).
+_ANNEX_KEYWORDS = {
+    "anexo", "termo", "declara", "modelo", "comunicado", "portaria",
+    "resultado", "homologa",
+}
 
 
 def _is_main_edital(text: str) -> bool:
