@@ -483,7 +483,9 @@ class TestSetecParser:
         mock_page.goto.side_effect = RuntimeError("Connection refused")
 
         with pytest.raises(RuntimeError, match="SETEC navigation failed after 3 attempts"):
-            await parser._goto_with_retry(mock_page, "https://example.com")
+            await parser._goto_with_retry(
+                mock_page, "https://example.com", attempts=3, base_delay=0.01
+            )
 
 
 # ---- Config / Settings tests ----

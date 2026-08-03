@@ -2,15 +2,47 @@
 
 Scraper de editais de fomento à pesquisa (CAPES, CNPq, FINEP, FAPESB, SETEC, CONFAP, EMBRAPII, BNDES, MCTI).
 
-_Última atualização: 03/08/2026_
+_Última atualização: 03/08/2026 (sessão foco: FAPESB, CNPq, FINEP, CAPES, SETEC-MEC)_
 
 ## Estado atual
 
-- Crawl completo: **03/08/2026** — **900 registros** no `oportunidades.db` (após limpeza de 150 registros-lixo do MCTI)
+- Crawl completo: **03/08/2026** — **1244 registros** no `oportunidades.db`
 - Distribuição no banco:
-  - CAPES 654 · SETEC 151 · FINEP 36 · EMBRAPII 29 · FAPESB 18 · CONFAP 8 · BNDES 3 · CNPq 1
-  - **MCTI: 0** (todos os 150 registros antigos eram ruído de menu/rodapé; parser corrigido, mas site está com CAPTCHA)
+  - CAPES 654 · SETEC 495 · FINEP 36 · EMBRAPII 29 · FAPESB 18 · CONFAP 8 · BNDES 3 · CNPq 1
+  - **MCTI: 0** (parser corrigido, aguardando site liberar do CAPTCHA)
 - Todos os 29 testes passam (`python -m pytest`).
+
+## Foco: FAPESB, CNPq, FINEP, CAPES, SETEC-MEC
+
+| Instituição | Registros | Estado | Última captura |
+|---|---|---|---|
+| CAPES | 654 | ✅ consistente (365 itens por crawl, 0 erros) | 03/08 |
+| SETEC | 495 | ✅ **reparado hoje** (era 0 por CAPTCHA + seletores quebrados) | 03/08 |
+| FINEP | 36 | ✅ consistente (API REST, 0 erros) | 03/08 |
+| FAPESB | 18 | ✅ consistente (0 erros) | 03/08 |
+| CNPq | 1 | ✅ funcional (só 1 chamada aberta hoje: PROAFRICA) | 03/08 |
+
+### SETEC — reparo em 03/08
+
+- Site MEC aplica **CAPTCHA intermitente** ("human visitor") — `_goto_with_retry` reescrito com 6 tentativas, espera crescente (8–48s) e detecção de bloqueio.
+- Estrutura da página mudou: links de ano agora em `.../secretaria-de-educacao-profissional/editais/2026` (antes `/centrais-de-conteudo/editais/2026`) — seletor atualizado.
+- PDFs agora são links diretos `a[href*=".pdf"]` (antes `a[href*="/editais/pdf/"]`) — seletor atualizado.
+- Título contextual quando o link é vago ("Edital", "(documento Nº ...)") — usa texto do item pai.
+- Filtro de anexos (anexo/modelo/termo de autorização) — não são editais.
+- Resultado: 344 itens / 301 novos capturados (2026 → anterior-a-2021).
+- Obs.: 151 registros antigos (16/06) são de outra seção (SESU/UNESCO, ex. TR_21_2026_SV_914Brz1102) — mantidos como complemento; títulos são nomes de arquivo.
+
+## Sessões anteriores (03/08)
+
+- Ambiente restaurado (playwright/pandas/numpy corrompidos); `main.py` com bootstrap de `sys.path`.
+- CAPES/CNPq/BNDES/MCTI reparados; 150 registros-lixo do MCTI removidos.
+
+## Pendências
+
+- [ ] **MCTI**: CAPTCHA intermitente — parser corrigido aguardando o site liberar para validar.
+- [ ] **SETEC antigos**: títulos dos 151 registros SESU/UNESCO (16/06) são nomes de arquivo — melhorar se houver acesso.
+- [ ] **Ruff/CI**: 116 erros de lint pré-existentes — decidir limpeza ou ajuste do CI.
+- [ ] `pyproject.toml` dependencies desatualizadas (faltam httpx/bs4; entry point `main` inexistente).
 
 ## Sessão de 03/08/2026 — o que foi feito
 

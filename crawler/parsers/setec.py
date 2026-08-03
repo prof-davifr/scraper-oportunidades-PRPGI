@@ -40,20 +40,28 @@ class SetecParser:
         self.max_items = max_items
 
     async def _goto_with_retry(
-        self, page, url: str, attempts: int = 3, base_delay: float = 1.0
+        self, page, url: str, attempts: int = 6, base_delay: float = 8.0
     ) -> None:
+        """Navega com retry. O gov.br/MEC aplica CAPTCHA intermitente
+        ("human visitor") — detecta o bloqueio e espera antes de tentar de novo."""
         last_exc = None
         for attempt in range(1, attempts + 1):
             try:
-                await page.goto(url, timeout=30000, wait_until="domcontentloaded")
-                await page.wait_for_timeout(3000)
+                await page.goto(url, timeout=45000, wait_until="domcontentloaded")
+                await page.wait_for_timeout(4000)
+                try:
+                    body = await page.locator("body").inner_text()
+                except Exception:
+                    body = ""
+                if "human visitor" in body or "What code is in the image" in body:
+                    raise RuntimeError("CAPTCHA/anti-bot detected by gov.br/MEC")
                 return
             except Exception as exc:
                 last_exc = exc
                 if attempt < attempts:
-                    sleep_time = base_delay * (2 ** (attempt - 1))
+                    sleep_time = base_delay * attempt
                     logger.warning(
-                        "SETEC navigation failed (attempt %s/%s): %s. Retrying in %.1fs",
+                        "SETEC blocked (attempt %s/%s): %s. Aguardando %.1fs",
                         attempt,
                         attempts,
                         exc,
@@ -63,9 +71,11 @@ class SetecParser:
         raise RuntimeError(f"SETEC navigation failed after {attempts} attempts") from last_exc
 
     async def _get_year_links(self, page) -> list[str]:
+        # A estrutura mudou: os links de ano ficam sob o caminho da secretaria
+        # (antes eram /centrais-de-conteudo/editais/).
         links = await page.locator(
-            'a[href*="/centrais-de-conteudo/editais/202"], '
-            'a[href*="/centrais-de-conteudo/editais/Anterior"]'
+            'a[href*="/editais/202"], '
+            'a[href*="/editais/anterior-a-2021"]'
         ).all()
         seen = set()
         result = []
@@ -83,7 +93,8 @@ class SetecParser:
         try:
             await self._goto_with_retry(page, year_url)
 
-            pdf_links = await page.locator('a[href*="/editais/pdf/"]').all()
+            # Editais agora são links .pdf diretos (ex.: SEI_6991254_chamada.pdf)
+            pdf_links = await page.locator('#content a[href*=".pdf"]').all()
             items = []
             seen_hrefs = set()
 
@@ -97,17 +108,32 @@ class SetecParser:
                 seen_hrefs.add(href)
 
                 link_text = (await link.text_content() or "").strip()
-                if link_text.lower() in ("clique aqui", "aqui", ""):
-                    parent = link.locator("..")
-                    strong = parent.locator("strong").first
-                    if await strong.count() > 0:
-                        title = (await strong.text_content() or "").strip()
+                # Título vago ("Edital", "Retificação", "(documento Nº ...)"):
+                # usa o texto do item pai (li/div) para dar contexto.
+                if (
+                    not link_text
+                    or len(link_text) < 12
+                    or link_text.lower().startswith("(")
+                ):
+                    parent = link.locator("xpath=ancestor::li[1] | ancestor::div[1]")
+                    parent_text = ""
+                    try:
+                        parent_text = (await parent.first.inner_text() or "").strip()
+                    except Exception:
+                        parent_text = ""
+                    if parent_text:
+                        title = parent_text.split("\n")[0].strip()[:200]
                     else:
                         title = href.rsplit("/", 1)[-1].replace(".pdf", "").replace("-", " ").replace("_", " ").title()
                 else:
                     title = link_text
 
                 if not title:
+                    continue
+
+                # Exclui documentos de apoio (anexos/modelos) — não são editais.
+                low = title.lower()
+                if any(kw in low for kw in ("anexo", "modelo do formulário", "modelo de formulário", "termo de autorização")):
                     continue
 
                 items.append({
