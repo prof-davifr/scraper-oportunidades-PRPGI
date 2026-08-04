@@ -18,3 +18,7 @@ editais.xlsx
 crawler/oportunidades.db
 crawler/editais.csv
 crawler/editais.xlsx
+
+# PyInstaller artifacts
+build/
+dist/
