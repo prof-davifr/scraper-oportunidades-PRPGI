@@ -392,10 +392,14 @@ class OpportunityDatabase:
   tr.recent {{ background: #eef7ef; }}
   tr.recent td.pub::after {{ content: " • novo"; color: #00853f; font-weight: 600; font-size: .72rem; }}
   .empty {{ text-align: center; padding: 3rem 1rem; color: #888; }}
-  .sobre {{ background: #fff; border: 1px solid #e0e0e0; border-left: 4px solid #165c33; border-radius: 8px; padding: .55rem 1rem; margin-bottom: 1.25rem; }}
-  .sobre summary {{ cursor: pointer; font-weight: 600; color: #165c33; user-select: none; font-size: .9rem; }}
-  .sobre-body {{ margin-top: .6rem; font-size: .875rem; color: #444; line-height: 1.55; }}
-  .sobre-body p {{ margin: .35rem 0; }}
+  .btn-sobre {{ margin-top: .5rem; background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.5); border-radius: 20px; padding: .3rem .9rem; font-size: .78rem; cursor: pointer; font-weight: 600; transition: background .15s; }}
+  .btn-sobre:hover {{ background: rgba(255,255,255,.3); }}
+  .modal-overlay {{ display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 50; align-items: center; justify-content: center; padding: 1rem; }}
+  .modal {{ background: #fff; border-radius: 12px; max-width: 560px; width: 100%; padding: 1.75rem 2rem; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,.3); max-height: 90vh; overflow-y: auto; }}
+  .modal h2 {{ color: #165c33; margin-bottom: .75rem; font-size: 1.2rem; }}
+  .modal p {{ margin: .5rem 0; font-size: .9rem; color: #444; line-height: 1.55; }}
+  .modal-close {{ position: absolute; top: .75rem; right: .9rem; background: none; border: none; font-size: 1.15rem; cursor: pointer; color: #888; }}
+  .modal-close:hover {{ color: #165c33; }}
   .sobre-note {{ color: #8a6d3b; font-size: .8rem; }}
   @media (max-width: 640px) {{
     header {{ padding: 1rem; }}
@@ -410,19 +414,21 @@ class OpportunityDatabase:
   <header>
     <div>
       <h1>Editais de Pesquisa e Inovação</h1>
-      <p>Assessoria de Ciência de Dados - PRPGI / IFBA</p>
+      <p>Assessoria de Ciência de Dados - NPP - PRPGI / IFBA</p>
+      <button class="btn-sobre" onclick="openSobre()">ℹ️ Sobre</button>
     </div>
     <img class="logo" src="data:image/svg+xml;base64,{logo_b64}" alt="Instituto Federal da Bahia">
   </header>
-  <details class="sobre">
-    <summary>Sobre</summary>
-    <div class="sobre-body">
+  <div class="modal-overlay" id="sobreModal" onclick="if(event.target === this) closeSobre()">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sobreTitle">
+      <button class="modal-close" onclick="closeSobre()" aria-label="Fechar">✕</button>
+      <h2 id="sobreTitle">Sobre</h2>
       <p><strong>Versão beta — em testes.</strong> Esta página coleta automaticamente editais e chamadas de fomento à pesquisa das fontes oficiais (CAPES, CNPq, FINEP, FAPESB e SETEC) e é atualizada diariamente.</p>
       <p>Faz parte das ações do <strong>Núcleo de Prospecção de Projetos</strong> e da <strong>Assessoria de Ciência de Dados</strong> — PRPGI/IFBA.</p>
       <p>Responsável: <strong>Davi Franco Rêgo</strong>.</p>
       <p class="sobre-note">⚠️ Em caso de divergência ou dúvida, consulte sempre o edital original na fonte.</p>
     </div>
-  </details>
+  </div>
   <div class="stats">
     <span class="badge badge-total" data-inst="" onclick="filterByInst('')">Total: {total_count}</span>
     {inst_badges}
@@ -508,6 +514,17 @@ function sortTable(col) {{
     if (i === col) th.classList.add(dir > 0 ? 'sort-asc' : 'sort-desc');
   }});
 }}
+function openSobre() {{
+  document.getElementById('sobreModal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}}
+function closeSobre() {{
+  document.getElementById('sobreModal').style.display = 'none';
+  document.body.style.overflow = '';
+}}
+document.addEventListener('keydown', e => {{
+  if (e.key === 'Escape') closeSobre();
+}});
 </script>
 </body>
 </html>"""
