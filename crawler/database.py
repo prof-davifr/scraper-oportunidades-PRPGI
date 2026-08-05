@@ -392,6 +392,11 @@ class OpportunityDatabase:
   tr.recent {{ background: #eef7ef; }}
   tr.recent td.pub::after {{ content: " • novo"; color: #00853f; font-weight: 600; font-size: .72rem; }}
   .empty {{ text-align: center; padding: 3rem 1rem; color: #888; }}
+  .sobre {{ background: #fff; border: 1px solid #e0e0e0; border-left: 4px solid #165c33; border-radius: 8px; padding: .55rem 1rem; margin-bottom: 1.25rem; }}
+  .sobre summary {{ cursor: pointer; font-weight: 600; color: #165c33; user-select: none; font-size: .9rem; }}
+  .sobre-body {{ margin-top: .6rem; font-size: .875rem; color: #444; line-height: 1.55; }}
+  .sobre-body p {{ margin: .35rem 0; }}
+  .sobre-note {{ color: #8a6d3b; font-size: .8rem; }}
   @media (max-width: 640px) {{
     header {{ padding: 1rem; }}
     header .logo {{ height: 48px; }}
@@ -409,6 +414,15 @@ class OpportunityDatabase:
     </div>
     <img class="logo" src="data:image/svg+xml;base64,{logo_b64}" alt="Instituto Federal da Bahia">
   </header>
+  <details class="sobre">
+    <summary>Sobre</summary>
+    <div class="sobre-body">
+      <p><strong>Versão beta — em testes.</strong> Esta página coleta automaticamente editais e chamadas de fomento à pesquisa das fontes oficiais (CAPES, CNPq, FINEP, FAPESB e SETEC) e é atualizada diariamente.</p>
+      <p>Faz parte das ações do <strong>Núcleo de Prospecção de Projetos</strong> e da <strong>Assessoria de Ciência de Dados</strong> — PRPGI/IFBA.</p>
+      <p>Responsável: <strong>Davi Franco Rêgo</strong>.</p>
+      <p class="sobre-note">⚠️ Em caso de divergência ou dúvida, consulte sempre o edital original na fonte.</p>
+    </div>
+  </details>
   <div class="stats">
     <span class="badge badge-total" data-inst="" onclick="filterByInst('')">Total: {total_count}</span>
     {inst_badges}
