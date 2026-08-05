@@ -38,7 +38,7 @@ def is_blocked(text: str) -> bool:
 async def fetch_text(
     client: httpx.AsyncClient,
     url: str,
-    attempts: int = 4,
+    attempts: int = 5,
     base_delay: float = 3.0,
 ) -> str:
     """GET com retry/backoff e detecção de bloqueio.
@@ -69,8 +69,12 @@ async def fetch_text(
     raise RuntimeError(f"HTTP failed after {attempts} attempts: {url[:70]}") from last_exc
 
 
-def make_client(timeout: float = 45.0) -> httpx.AsyncClient:
-    """AsyncClient com headers padrão (navegador)."""
+def make_client(timeout: float = 60.0) -> httpx.AsyncClient:
+    """AsyncClient com headers padrão (navegador).
+
+    Timeout maior para o contexto de CI (IP de datacenter pode ser
+    lento ou bloqueado pelo gov.br).
+    """
     return httpx.AsyncClient(
         headers=DEFAULT_HEADERS,
         timeout=timeout,
