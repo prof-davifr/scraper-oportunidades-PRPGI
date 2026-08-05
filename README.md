@@ -2,6 +2,16 @@
 
 Coletor de editais de fomento à pesquisa brasileiros — **CAPES, CNPq, FINEP, FAPESB e SETEC** — que gera planilha Excel, CSV e página HTML.
 
+## 🌐 Acesso público (atualização diária automática)
+
+O scraper roda **todo dia às 08:00 (Brasília)** em um repositório público via GitHub Actions e publica os resultados no GitHub Pages:
+
+- **Página de editais (HTML):** https://prof-davifr.github.io/scraper-oportunidades-PRPGI/
+- **Planilha Excel:** https://prof-davifr.github.io/scraper-oportunidades-PRPGI/editais.xlsx
+- **CSV:** https://prof-davifr.github.io/scraper-oportunidades-PRPGI/editais.csv
+
+O banco SQLite (`oportunidades.db`) é **persistido no repositório** a cada rodada, preservando o histórico e a deduplicação. Também dá para rodar o crawl manualmente pela aba *Actions → Crawl diário + Pages → Run workflow*.
+
 ## 👤 Para usuários finais (Windows, sem instalar nada)
 
 1. Baixe o executável **`GeradorEditais.exe`** (disponível em *Actions* do repositório → artifact do job `build-windows`).
@@ -34,6 +44,7 @@ python crawler/main.py --parser capes      # só CAPES
 python crawler/main.py --max-items 100     # limite por fonte
 python crawler/main.py --output-dir ~/editais   # gera em outra pasta
 python crawler/main.py --no-consolidate    # sem agrupar documentos do mesmo edital
+python crawler/main.py --force-export      # regenera exports mesmo sem registros novos (banco persistido)
 ```
 
 ### Testes

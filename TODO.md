@@ -23,6 +23,18 @@ _Última atualização: 04/08/2026 (sessão: remoção do MCTI — página de ed
 | FAPESB | 20 | ✅ consistente; 20/20 com data de lançamento (REST WP); 7/20 com prazo | 04/08 |
 | CNPq | 10 | ✅ **migrado para o novo site** (gov.br) — 10/10 com data | 04/08 |
 
+## Sessão 04/08 — repositório público + crawl diário + GitHub Pages
+
+- **Decisão do usuário**: disponibilizar para a PRPGI/IFBA — repo público, banco persistido, atualização automática diária, HTML público via Pages.
+- **Plano salvo em `PLANO_DEPLOY.md`** (arquitetura, tarefas, riscos).
+- **Projeto movido** do monorepo `PRPGI/` para `~/projetos/repos-independentes/scraper-oportunidades-PRPGI` com histórico preservado (`git subtree split` — 10 commits). Repo: `github.com/prof-davifr/scraper-oportunidades-PRPGI` (público).
+- **`crawler/main.py`**: flag `--force-export` — regenera CSV/XLSX/HTML mesmo com `new=0` (essencial com banco persistido).
+- **`.gitignore`**: `oportunidades.db` e `editais.*` **deixaram de ser ignorados** — banco e exports agora são versionados (persistência). Resíduos `crawler/oportunidades.db` (base de março, 14 regs) removidos.
+- **`.github/workflows/crawl.yml`** (novo): cron `0 11 * * *` (08h BRT) + push na main + `workflow_dispatch` → crawl com `--force-export` → commit-back → deploy GitHub Pages (`_site/` com `editais.html → index.html`).
+- **`ci.yml`**: corrigido job `test` (removido `playwright install chromium` — playwright não é mais dependência e quebrava o job).
+- **Banco inicial versionado**: 434 registros (04/08).
+- Página pública: `https://prof-davifr.github.io/scraper-oportunidades-PRPGI/`.
+
 ## Sessão 04/08 — remoção do MCTI
 
 - **Decisão do usuário**: MCTI fora do escopo — a página de editais (`gov.br/mcti/pt-br/acesso-a-informacao/editais`) passou a responder **302 → `require_login`** (autenticação gov.br) e o link de referência (`acompanhe-o-mcti/editais-concursos-e-chamadas-publicas`) é **404**. Não há listagem pública de editais do MCTI (só notícias).

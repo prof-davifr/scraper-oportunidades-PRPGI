@@ -51,6 +51,7 @@ async def run_crawler(
     max_items: Optional[int] = None,
     settings: Optional[Settings] = None,
     no_consolidate: bool = False,
+    force_export: bool = False,
 ) -> None:
     if settings is None:
         settings = Settings()
@@ -99,7 +100,7 @@ async def run_crawler(
     total_errors = sum(int(result["errors"]) for result in run_results)
     total_processed = sum(int(result["processed"]) for result in run_results)
 
-    should_export = total_new > 0 or not Path(settings.xlsx_path).exists()
+    should_export = total_new > 0 or force_export or not Path(settings.xlsx_path).exists()
     if should_export:
         logger.info("Exporting to spreadsheet...")
         exported_csv, exported_xlsx = db.export_to_spreadsheet(
@@ -156,6 +157,11 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         "--no-consolidate",
         action="store_true",
         help="Export sem consolidação (uma linha por documento, incluindo duplicatas e atualizações).",
+    )
+    parser.add_argument(
+        "--force-export",
+        action="store_true",
+        help="Sempre regenerar os exports (CSV/XLSX/HTML), mesmo sem novos registros na rodada (útil com banco persistido).",
     )
     parser.add_argument(
         "--output-dir",
@@ -232,6 +238,7 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
             max_items=args.max_items,
             settings=settings,
             no_consolidate=args.no_consolidate,
+            force_export=args.force_export,
         )
     )
 

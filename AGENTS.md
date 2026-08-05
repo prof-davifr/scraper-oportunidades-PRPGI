@@ -36,6 +36,13 @@ No lockfile exists; dependencies are tracked in `requirements.txt`.
 - **Standalone parser execution**: Parser `__main__` blocks resolve project root robustly and write outputs to root-level files.
 - **GUI**: `crawler/gui.py` — tkinter window ("Gerar Editais"), writes outputs next to the executable (PyInstaller frozen) or cwd.
 
+## GitHub Actions / deploy
+
+- **`crawl.yml`** — roda diariamente (cron `0 11 * * *` = 08:00 BRT), a cada push na `main` e manualmente (`workflow_dispatch`): executa `python crawler/main.py --force-export`, **comita banco + exports de volta** (persistência do `oportunidades.db`) e publica no **GitHub Pages** (`prof-davifr.github.io/scraper-oportunidades-PRPGI`). O `--force-export` é obrigatório: com banco persistido, rodadas sem registros novos teriam `new=0` e o export seria pulado.
+- **`ci.yml`** — lint (ruff — tem falhas pré-existentes), testes (`pytest`) e build do exe Windows (PyInstaller) a cada push/PR.
+- Push do `github-actions[bot]` **não re-dispara** workflows (comportamento padrão do `GITHUB_TOKEN`) — sem loop.
+- O site Pages monta `_site/` com `editais.html → index.html` + `editais.csv/xlsx`.
+
 ## Windows executable (distribution)
 
 - Build via PyInstaller: `pyinstaller scraper_exe.spec --noconfirm` → `dist/GeradorEditais(.exe)`
@@ -49,6 +56,7 @@ No lockfile exists; dependencies are tracked in `requirements.txt`.
 - **SETEC (`gov.br/mec`)**: after several accesses it may block for minutes — rerun later.
 - **MCTI (removido)**: a página de editais passou a exigir login gov.br (302 → `require_login`) e o link de referência virou 404 — parser removido do sistema em 04/08/2026. Reavaliar se o MCTI voltar a publicar listagem pública.
 - **No tests, no CI, no linting**: legacy statement — actually there IS pytest (46 tests) and CI (lint+test+build-windows). Ruff check has pre-existing failures; CI runs `ruff check .` (may fail — decide whether to clean or adjust).
+- **Deploy automático**: o `crawl.yml` roda em IP de datacenter (Azure) — `gov.br` pode bloquear; o job aceita resultado parcial e o site mantém a última versão boa. Rodada manual via `workflow_dispatch`.
 - **Dependency manifest**: runtime deps in `requirements.txt` (httpx, beautifulsoup4, pandas, openpyxl, pypdf) and `pyproject.toml`.
 
 ## Adding a new parser

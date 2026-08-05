@@ -1,0 +1,73 @@
+name: Crawl diário + Pages
+
+on:
+  schedule:
+    # 11:00 UTC = 08:00 BRT — horário comercial brasileiro
+    - cron: "0 11 * * *"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: crawl-pages
+  cancel-in-progress: false
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Crawl (todas as fontes)
+        run: python crawler/main.py --force-export
+        env:
+          # sem prompts; httpx puro
+          PYTHONUNBUFFERED: 1
+
+      - name: Commit banco + exports (persistência)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Sem alterações — nada a commitar"
+          else
+            git commit -m "chore: crawl $(date -u +%Y-%m-%d) — atualização de editais"
+            git push
+          fi
+
+      - name: Preparar site (GitHub Pages)
+        run: |
+          mkdir -p _site
+          cp editais.html _site/index.html
+          cp editais.csv _site/
+          cp editais.xlsx _site/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: crawl
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
