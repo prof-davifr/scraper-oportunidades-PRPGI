@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import re
 import sqlite3
@@ -231,6 +232,10 @@ class OpportunityDatabase:
                 única linha, com os documentos relacionados em um seletor
                 expansível (coluna "Documentos").
         """
+        # Símbolo IFBA embutido como data URI (mantém o HTML standalone)
+        logo_svg = Path(__file__).resolve().parent / "assets" / "ifba-logo-branco.svg"
+        logo_b64 = base64.b64encode(logo_svg.read_bytes()).decode("ascii")
+
         if consolidate:
             from crawler.consolidate import consolidate_editais
 
@@ -343,9 +348,10 @@ class OpportunityDatabase:
     background: #f5f5f5; color: #222; line-height: 1.5; padding: 1rem;
   }}
   .container {{ max-width: 1280px; margin: 0 auto; }}
-  header {{ background: linear-gradient(135deg, #165c33, #00853f); color: #fff; padding: 1.5rem 2rem; border-radius: 10px; margin-bottom: 1.5rem; }}
+  header {{ background: linear-gradient(135deg, #165c33, #00853f); color: #fff; padding: 1.5rem 2rem; border-radius: 10px; margin-bottom: 1.5rem; display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }}
   header h1 {{ font-size: 1.5rem; font-weight: 700; margin-bottom: .25rem; }}
   header p {{ opacity: .85; font-size: .9rem; }}
+  header .logo {{ height: 72px; width: auto; flex-shrink: 0; filter: drop-shadow(0 2px 4px rgba(0,0,0,.25)); }}
   .stats {{ display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.25rem; }}
   .badge {{ display: inline-block; padding: .35em .75em; border-radius: 20px; font-size: .8rem; font-weight: 600; background: #e0e0e0; color: #333; border: 2px solid transparent; cursor: pointer; }}
   .badge:hover {{ border-color: #165c33; }}
@@ -388,6 +394,7 @@ class OpportunityDatabase:
   .empty {{ text-align: center; padding: 3rem 1rem; color: #888; }}
   @media (max-width: 640px) {{
     header {{ padding: 1rem; }}
+    header .logo {{ height: 48px; }}
     .desc {{ max-width: 140px; }}
     td, th {{ padding: .4rem .3rem; font-size: .8rem; }}
   }}
@@ -396,8 +403,11 @@ class OpportunityDatabase:
 <body>
 <div class="container">
   <header>
-    <h1>Editais de Pesquisa e Inovação</h1>
-    <p>Oportunidades coletadas automaticamente — PRPGI / IFBA</p>
+    <div>
+      <h1>Editais de Pesquisa e Inovação</h1>
+      <p>Assessoria de Ciência de Dados - PRPGI / IFBA</p>
+    </div>
+    <img class="logo" src="data:image/svg+xml;base64,{logo_b64}" alt="Instituto Federal da Bahia">
   </header>
   <div class="stats">
     <span class="badge badge-total" data-inst="" onclick="filterByInst('')">Total: {total_count}</span>
