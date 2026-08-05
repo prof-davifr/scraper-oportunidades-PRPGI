@@ -3,9 +3,8 @@ import logging
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
-import httpx
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
@@ -19,13 +18,13 @@ from crawler.http_utils import fetch_text, make_client
 
 
 class CnpqParser:
-    def __init__(self, max_items: Optional[int] = 50):
+    def __init__(self, max_items: int | None = 50):
         # O CNPq migrou do Liferay (memoria2.cnpq.br) para o portal gov.br.
         self.url = "https://www.gov.br/cnpq/pt-br/chamadas/abertas-para-submissao"
         self.institution = "CNPq"
         self.max_items = max_items
 
-    async def parse(self, db, max_items: Optional[int] = None) -> Dict[str, Any]:
+    async def parse(self, db, max_items: int | None = None) -> dict[str, Any]:
         item_limit = self.max_items if max_items is None else max_items
 
         inserted_count = 0
@@ -124,7 +123,5 @@ if __name__ == "__main__":
     db = OpportunityDatabase(str(PROJECT_ROOT / "oportunidades.db"))
     parser = CnpqParser()
     result = asyncio.run(parser.parse(db))
-    db.export_to_spreadsheet(
-        str(PROJECT_ROOT / "editais.csv"), str(PROJECT_ROOT / "editais.xlsx")
-    )
+    db.export_to_spreadsheet(str(PROJECT_ROOT / "editais.csv"), str(PROJECT_ROOT / "editais.xlsx"))
     logger.info("Done: %s", result)

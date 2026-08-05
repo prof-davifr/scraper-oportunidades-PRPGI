@@ -16,10 +16,17 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from crawler.http_utils import fetch_text, make_client
 
-
 # Palavras que identificam o título de um edital/chamada
-_EDITAL_KEYWORDS = ("edital", "chamada", "chamamento", "seleção", "selecao",
-                    "termo de referência", "tr nº", "processo seletivo")
+_EDITAL_KEYWORDS = (
+    "edital",
+    "chamada",
+    "chamamento",
+    "seleção",
+    "selecao",
+    "termo de referência",
+    "tr nº",
+    "processo seletivo",
+)
 
 
 class SetecParser:
@@ -32,9 +39,7 @@ class SetecParser:
         # Links de ano ficam sob o caminho da secretaria (ex.: .../editais/2026)
         links = []
         seen = set()
-        for a in soup.select(
-            'a[href*="/editais/202"], a[href*="/editais/anterior-a-2021"]'
-        ):
+        for a in soup.select('a[href*="/editais/202"], a[href*="/editais/anterior-a-2021"]'):
             href = a.get("href", "")
             if href and href not in seen:
                 seen.add(href)
@@ -77,9 +82,7 @@ class SetecParser:
                     a = li.find("a", href=True)
                     if not a:
                         continue
-                    out[-1]["links"].append(
-                        {"text": li.get_text(" ", strip=True), "href": a["href"]}
-                    )
+                    out[-1]["links"].append({"text": li.get_text(" ", strip=True), "href": a["href"]})
         return out
 
     def _pick_edital(self, block: dict) -> dict | None:
@@ -101,8 +104,17 @@ class SetecParser:
             fname = (href or "").lower().split("/")[-1]
             return any(
                 kw in fname
-                for kw in ("retifica", "anexo", "_modelo", "formulario", "formulário",
-                           "declaracao", "termo", "planodetrabalho", "plano_de_trabalho")
+                for kw in (
+                    "retifica",
+                    "anexo",
+                    "_modelo",
+                    "formulario",
+                    "formulário",
+                    "declaracao",
+                    "termo",
+                    "planodetrabalho",
+                    "plano_de_trabalho",
+                )
             )
 
         links = block.get("links", [])
@@ -253,7 +265,5 @@ if __name__ == "__main__":
     db = OpportunityDatabase(str(PROJECT_ROOT / "oportunidades.db"))
     parser = SetecParser()
     result = asyncio.run(parser.parse(db))
-    db.export_to_spreadsheet(
-        str(PROJECT_ROOT / "editais.csv"), str(PROJECT_ROOT / "editais.xlsx")
-    )
+    db.export_to_spreadsheet(str(PROJECT_ROOT / "editais.csv"), str(PROJECT_ROOT / "editais.xlsx"))
     logger.info("Done: %s", result)

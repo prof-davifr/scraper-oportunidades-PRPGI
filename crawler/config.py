@@ -18,6 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
 @dataclass
 class Source:
     """Registry entry for a parser source."""
+
     name: str
     module: str
     class_name: str
@@ -50,43 +51,45 @@ class Settings:
     default_max_items: int | None = None
 
     # Sources registry — each entry maps a CLI name to a parser class location
-    SOURCES: list[Source] = field(default_factory=lambda: [
-        Source(
-            name="capes",
-            module="crawler.parsers.capes",
-            class_name="CapesParser",
-            url="https://www.gov.br/capes/pt-br/assuntos/editais-e-resultados-capes",
-            description="Coordenação de Aperfeiçoamento de Pessoal de Nível Superior (CAPES)",
-        ),
-        Source(
-            name="cnpq",
-            module="crawler.parsers.cnpq",
-            class_name="CnpqParser",
-            url="https://www.gov.br/cnpq/pt-br/chamadas/abertas-para-submissao",
-            description="Conselho Nacional de Desenvolvimento Científico e Tecnológico (CNPq)",
-        ),
-        Source(
-            name="finep",
-            module="crawler.parsers.finep",
-            class_name="FinepParser",
-            url="http://www.finep.gov.br/chamadas-publicas/chamadaspublicas?situacao=aberta",
-            description="Financiadora de Estudos e Projetos (FINEP)",
-        ),
-        Source(
-            name="fapesb",
-            module="crawler.parsers.fapesb",
-            class_name="FapesbParser",
-            url="https://www.fapesb.ba.gov.br/category/edital/",
-            description="Fundação de Amparo à Pesquisa do Estado da Bahia (FAPESB)",
-        ),
-        Source(
-            name="setec",
-            module="crawler.parsers.setec",
-            class_name="SetecParser",
-            url="https://www.gov.br/mec/pt-br/acesso-a-informacao/institucional/estrutura-organizacional/orgaos-especificos-singulares/secretaria-de-educacao-profissional/editais",
-            description="Secretaria de Educação Profissional e Tecnológica (SETEC/MEC)",
-        ),
-    ])
+    SOURCES: list[Source] = field(
+        default_factory=lambda: [
+            Source(
+                name="capes",
+                module="crawler.parsers.capes",
+                class_name="CapesParser",
+                url="https://www.gov.br/capes/pt-br/assuntos/editais-e-resultados-capes",
+                description="Coordenação de Aperfeiçoamento de Pessoal de Nível Superior (CAPES)",
+            ),
+            Source(
+                name="cnpq",
+                module="crawler.parsers.cnpq",
+                class_name="CnpqParser",
+                url="https://www.gov.br/cnpq/pt-br/chamadas/abertas-para-submissao",
+                description="Conselho Nacional de Desenvolvimento Científico e Tecnológico (CNPq)",
+            ),
+            Source(
+                name="finep",
+                module="crawler.parsers.finep",
+                class_name="FinepParser",
+                url="http://www.finep.gov.br/chamadas-publicas/chamadaspublicas?situacao=aberta",
+                description="Financiadora de Estudos e Projetos (FINEP)",
+            ),
+            Source(
+                name="fapesb",
+                module="crawler.parsers.fapesb",
+                class_name="FapesbParser",
+                url="https://www.fapesb.ba.gov.br/category/edital/",
+                description="Fundação de Amparo à Pesquisa do Estado da Bahia (FAPESB)",
+            ),
+            Source(
+                name="setec",
+                module="crawler.parsers.setec",
+                class_name="SetecParser",
+                url="https://www.gov.br/mec/pt-br/acesso-a-informacao/institucional/estrutura-organizacional/orgaos-especificos-singulares/secretaria-de-educacao-profissional/editais",
+                description="Secretaria de Educação Profissional e Tecnológica (SETEC/MEC)",
+            ),
+        ]
+    )
 
     def source_names(self) -> list[str]:
         """Return list of registered source names."""

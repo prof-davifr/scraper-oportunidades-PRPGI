@@ -40,7 +40,7 @@ gerador-editais-gui = "crawler.gui:main"
 
 [tool.ruff]
 target-version = "py311"
-line-length = 88
+line-length = 120
 
 [tool.ruff.lint]
 select = [
@@ -55,11 +55,16 @@ select = [
     "RUF", # ruff-specific rules
 ]
 ignore = [
-    "S101", # allow assert in tests
+    "S101",  # allow assert in tests
+    "RUF001", # en-dash em texto PT-BR é tipografia legítima (e regex de nº de edital usa – semanticamente)
+    "RUF003", # idem em comentários
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+"tests/**" = ["S101", "E501"]
+"crawler/parsers/**" = ["E402"]  # bootstrap sys.path intencional (execução standalone)
+"crawler/main.py" = ["E402"]     # idem
+"crawler/database.py" = ["E501"]  # templates HTML longos (CSS/JS embutidos)
 
 [tool.ruff.format]
 quote-style = "double"

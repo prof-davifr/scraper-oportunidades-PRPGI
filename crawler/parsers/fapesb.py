@@ -4,7 +4,7 @@ import logging
 import re
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -14,19 +14,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
-_UA = (
-    "Mozilla/5.0 (X11; Linux x86_64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/145.0.0.0 Safari/537.36"
-)
+_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"
 
 # Lista de editais: API REST do WordPress (categoria "Edital"), mais recentes
 # primeiro. A data de publicação vem do campo `date` (estável — o HTML da
 # página varia por cache/CDN e a listagem não preenche "LANÇAMENTO:").
-_API_URL = (
-    "https://www.fapesb.ba.gov.br/wp-json/wp/v2/posts"
-    "?categories=1&per_page=20&page=1&orderby=date&order=desc"
-)
+_API_URL = "https://www.fapesb.ba.gov.br/wp-json/wp/v2/posts?categories=1&per_page=20&page=1&orderby=date&order=desc"
 
 # Prazo real de inscrição, no corpo da página ou no texto do PDF do edital.
 # O widget "⏰ Início/Encerramento" é template fixo (mesmas datas em todas as
@@ -41,9 +34,7 @@ _DEADLINE_PATTERNS = (
         re.I,
     ),
     re.compile(r"prazo de submiss[ãa]o[^0-9]{0,90}?(\d{2}/\d{2}/\d{4})", re.I),
-    re.compile(
-        r"encerramento do prazo.{0,250}?(\d{2}/\d{2}/\d{4})", re.I
-    ),
+    re.compile(r"encerramento do prazo.{0,250}?(\d{2}/\d{2}/\d{4})", re.I),
     re.compile(
         r"(?:inscri[çc][õo]es|prazo)[^0-9]{0,90}?"
         r"(?:at[ée]|termina|encerra)[^0-9]{0,50}?(\d{2}/\d{2}/\d{4})",
@@ -113,9 +104,7 @@ class FapesbParser:
                 if href not in pdf_urls and not _PDF_SKIP.search(href):
                     pdf_urls.append(href)
             if pdf_urls:
-                pr = await client.get(
-                    pdf_urls[0], headers={"User-Agent": _UA}, timeout=60
-                )
+                pr = await client.get(pdf_urls[0], headers={"User-Agent": _UA}, timeout=60)
                 if pr.status_code == 200 and pr.content[:5] == b"%PDF-":
                     return _extract_deadline(_pdf_text(pr.content))
         except Exception:
@@ -140,9 +129,7 @@ class FapesbParser:
                 iterable = posts if item_limit is None else posts[:item_limit]
                 for post in iterable:
                     try:
-                        title = html.unescape(
-                            post.get("title", {}).get("rendered", "") or ""
-                        )
+                        title = html.unescape(post.get("title", {}).get("rendered", "") or "")
                         title = re.sub(r"\s+", " ", title).strip().rstrip(" -–—")
                         if not title:
                             continue
@@ -153,7 +140,9 @@ class FapesbParser:
                         deadline = await self._fetch_deadline(client, link)
 
                         content = re.sub(
-                            r"<[^>]+>", " ", post.get("content", {}).get("rendered", "") or ""
+                            r"<[^>]+>",
+                            " ",
+                            post.get("content", {}).get("rendered", "") or "",
                         )
                         content = re.sub(r"\s+", " ", content).strip()
 
@@ -202,7 +191,5 @@ if __name__ == "__main__":
     db = OpportunityDatabase(str(PROJECT_ROOT / "oportunidades.db"))
     parser = FapesbParser()
     result = asyncio.run(parser.parse(db))
-    db.export_to_spreadsheet(
-        str(PROJECT_ROOT / "editais.csv"), str(PROJECT_ROOT / "editais.xlsx")
-    )
+    db.export_to_spreadsheet(str(PROJECT_ROOT / "editais.csv"), str(PROJECT_ROOT / "editais.xlsx"))
     logger.info("Done: %s", result)

@@ -2,7 +2,7 @@ import hashlib
 import re
 import sqlite3
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Tuple
+from typing import Literal
 
 import pandas as pd
 
@@ -45,7 +45,7 @@ class OpportunityDatabase:
 
     def _generate_uid(self, title: str, link: str) -> str:
         """Generate deterministic unique key from title+link."""
-        return hashlib.sha256(f"{title}{link}".encode("utf-8")).hexdigest()
+        return hashlib.sha256(f"{title}{link}".encode()).hexdigest()
 
     def add_opportunity_with_result(
         self,
@@ -72,7 +72,16 @@ class OpportunityDatabase:
                     INSERT INTO opportunities (uid, institution, title, link, description, publication_date, deadline, status)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (uid, institution, title, link, description, pub_date, deadline, status),
+                    (
+                        uid,
+                        institution,
+                        title,
+                        link,
+                        description,
+                        pub_date,
+                        deadline,
+                        status,
+                    ),
                 )
                 conn.commit()
             return "inserted"
@@ -138,7 +147,7 @@ class OpportunityDatabase:
             return f"{m.group(3)}/{m.group(2)}/{m.group(1)}"
         return s
 
-    def _fetch_all_rows(self) -> List[Dict]:
+    def _fetch_all_rows(self) -> list[dict]:
         """Todos os registros como lista de dicts (para consolidação)."""
         with sqlite3.connect(self.db_path) as conn:
             cur = conn.cursor()
@@ -150,14 +159,14 @@ class OpportunityDatabase:
                 """
             )
             cols = [d[0] for d in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
+            return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
 
     def export_to_spreadsheet(
         self,
         csv_path: str = "editais.csv",
         xlsx_path: str = "editais.xlsx",
         consolidate: bool = True,
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """Export all opportunities to CSV and Excel.
 
         Args:
@@ -174,9 +183,7 @@ class OpportunityDatabase:
             groups = consolidate_editais(self._fetch_all_rows())
             data = []
             for g in groups:
-                related_text = " ; ".join(
-                    f"{r['title']} | {r['link']}" for r in g["related"]
-                )
+                related_text = " ; ".join(f"{r['title']} | {r['link']}" for r in g["related"])
                 data.append(
                     {
                         "Instituição": g["institution"],
@@ -210,17 +217,13 @@ class OpportunityDatabase:
                 )
                 # Data de lançamento em ISO (YYYY-MM-DD) -> DD/MM/YYYY para exibição
                 if "Data de Lançamento" in df.columns:
-                    df["Data de Lançamento"] = df["Data de Lançamento"].apply(
-                        lambda v: self._format_date(v)
-                    )
+                    df["Data de Lançamento"] = df["Data de Lançamento"].apply(lambda v: self._format_date(v))
 
         df.to_csv(csv_path, index=False, encoding="utf-8-sig")
         df.to_excel(xlsx_path, index=False)
         return csv_path, xlsx_path
 
-    def export_to_html(
-        self, html_path: str = "editais.html", consolidate: bool = True
-    ) -> str:
+    def export_to_html(self, html_path: str = "editais.html", consolidate: bool = True) -> str:
         """Export all opportunities to a standalone HTML page.
 
         Args:
@@ -232,7 +235,7 @@ class OpportunityDatabase:
             from crawler.consolidate import consolidate_editais
 
             groups = consolidate_editais(self._fetch_all_rows())
-            totals: Dict[str, int] = {}
+            totals: dict[str, int] = {}
             for g in groups:
                 totals[g["institution"]] = totals.get(g["institution"], 0) + 1
             total_count = sum(totals.values())
@@ -253,6 +256,7 @@ class OpportunityDatabase:
                 if pub_date:
                     try:
                         import datetime as _dt
+
                         pub_dt = _dt.date.fromisoformat(str(pub_date)[:10])
                         if (_dt.date.today() - pub_dt).days <= 60:
                             recent = ' class="recent"'
@@ -260,11 +264,11 @@ class OpportunityDatabase:
                         pass
                 if g["related"]:
                     docs_items = "".join(
-                        f"""<li><a href="{r['link']}" target="_blank" rel="noopener">{r['title'].replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')}</a> <span class="docdate">({self._format_date(r['publication_date']) or '—'})</span></li>"""
+                        f"""<li><a href="{r["link"]}" target="_blank" rel="noopener">{r["title"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")}</a> <span class="docdate">({self._format_date(r["publication_date"]) or "—"})</span></li>"""
                         for r in g["related"]
                     )
                     docs_cell = (
-                        f"<details class=\"docs\"><summary>{len(g['related'])} relacionado(s)</summary>"
+                        f'<details class="docs"><summary>{len(g["related"])} relacionado(s)</summary>'
                         f"<ul>{docs_items}</ul></details>"
                     )
                 else:
@@ -305,6 +309,7 @@ class OpportunityDatabase:
                 if pub_date:
                     try:
                         import datetime as _dt
+
                         pub_dt = _dt.date.fromisoformat(str(pub_date)[:10])
                         if (_dt.date.today() - pub_dt).days <= 60:
                             recent = ' class="recent"'
@@ -402,7 +407,7 @@ class OpportunityDatabase:
     <input type="text" id="filterTitle" placeholder="Buscar por título..." oninput="filterTable()">
     <select id="filterInst" onchange="filterTable()">
       <option value="">Todas as instituições</option>
-      {''.join(f'<option value="{k}">{k}</option>' for k in sorted(totals))}
+      {"".join(f'<option value="{k}">{k}</option>' for k in sorted(totals))}
     </select>
     <select id="filterRecent" onchange="filterTable()">
       <option value="">Todas as datas</option>
@@ -488,7 +493,7 @@ function sortTable(col) {{
 
         return html_path
 
-    def get_latest_opportunities(self, limit: int = 10) -> List[Tuple[str, str, str, str]]:
+    def get_latest_opportunities(self, limit: int = 10) -> list[tuple[str, str, str, str]]:
         """Return latest opportunities by capture time."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -516,17 +521,16 @@ function sortTable(col) {{
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT COUNT(*) FROM opportunities WHERE institution = ?", (institution,)
+                "SELECT COUNT(*) FROM opportunities WHERE institution = ?",
+                (institution,),
             )
             row = cursor.fetchone()
             return int(row[0]) if row else 0
 
-    def get_totals_by_institution(self) -> Dict[str, int]:
+    def get_totals_by_institution(self) -> dict[str, int]:
         """Return counts grouped by institution."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT institution, COUNT(*) FROM opportunities GROUP BY institution"
-            )
+            cursor.execute("SELECT institution, COUNT(*) FROM opportunities GROUP BY institution")
             rows = cursor.fetchall()
             return {str(institution): int(total) for institution, total in rows if institution}

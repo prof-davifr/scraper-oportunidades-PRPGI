@@ -1,9 +1,10 @@
-import asyncio
 import argparse
+import asyncio
 import logging
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -15,7 +16,7 @@ from crawler.database import OpportunityDatabase
 logger = logging.getLogger(__name__)
 
 
-def _normalize_result(result: Any, institution: str) -> Dict[str, int | str]:
+def _normalize_result(result: Any, institution: str) -> dict[str, int | str]:
     if isinstance(result, int):
         return {
             "institution": institution,
@@ -35,21 +36,16 @@ def _normalize_result(result: Any, institution: str) -> Dict[str, int | str]:
     raise ValueError(f"Unsupported parser result type: {type(result)!r}")
 
 
-def _build_parsers(
-    settings: Settings, selected_parser: str, max_items: Optional[int]
-) -> list:
+def _build_parsers(settings: Settings, selected_parser: str, max_items: int | None) -> list:
     if selected_parser == "all":
-        return [
-            settings.build_parser(name, max_items)
-            for name in settings.source_names()
-        ]
+        return [settings.build_parser(name, max_items) for name in settings.source_names()]
     return [settings.build_parser(selected_parser, max_items)]
 
 
 async def run_crawler(
     selected_parser: str = "all",
-    max_items: Optional[int] = None,
-    settings: Optional[Settings] = None,
+    max_items: int | None = None,
+    settings: Settings | None = None,
     no_consolidate: bool = False,
     force_export: bool = False,
 ) -> None:
@@ -61,7 +57,7 @@ async def run_crawler(
     db = OpportunityDatabase(settings.db_path)
     parsers = _build_parsers(settings, selected_parser, max_items)
 
-    run_results: list[Dict[str, int | str]] = []
+    run_results: list[dict[str, int | str]] = []
     for parser in parsers:
         logger.info("Running parser for %s...", parser.institution)
         try:
@@ -136,14 +132,12 @@ async def run_crawler(
     logger.info("Crawler finished.")
 
 
-def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
+def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     settings = Settings()
-    parser = argparse.ArgumentParser(
-        description="Scrape open editais from multiple Brazilian funding agencies."
-    )
+    parser = argparse.ArgumentParser(description="Scrape open editais from multiple Brazilian funding agencies.")
     parser.add_argument(
         "--parser",
-        choices=["all"] + settings.source_names(),
+        choices=["all", *settings.source_names()],
         default="all",
         help="Parser to run (default: all).",
     )
@@ -161,7 +155,7 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--force-export",
         action="store_true",
-        help="Sempre regenerar os exports (CSV/XLSX/HTML), mesmo sem novos registros na rodada (útil com banco persistido).",
+        help="Sempre regenerar os exports (CSV/XLSX/HTML), mesmo sem novos registros (banco persistido).",
     )
     parser.add_argument(
         "--output-dir",
@@ -203,7 +197,7 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[Iterable[str]] = None) -> None:
+def main(argv: Iterable[str] | None = None) -> None:
     """Entry point da CLI (usado pelo comando instalado `scraper-oportunidades`)."""
     args = parse_args(argv)
 

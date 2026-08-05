@@ -3,7 +3,7 @@ import logging
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import httpx
 from bs4 import BeautifulSoup
@@ -17,13 +17,23 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 _MAIN_URL = "https://www.gov.br/capes/pt-br/assuntos/editais-e-resultados-capes"
-_HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"}
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"
+    )
+}
 
 # Palavras que indicam que o PDF NÃO é o edital em si (anexos, modelos,
 # comunicados, resultados/homologações de seleção etc.).
 _ANNEX_KEYWORDS = {
-    "anexo", "termo", "declara", "modelo", "comunicado", "portaria",
-    "resultado", "homologa",
+    "anexo",
+    "termo",
+    "declara",
+    "modelo",
+    "comunicado",
+    "portaria",
+    "resultado",
+    "homologa",
 }
 
 
@@ -85,11 +95,11 @@ def _sanitize_pdf_url(raw: str) -> str:
 
 
 class CapesParser:
-    def __init__(self, max_items: Optional[int] = 100):
+    def __init__(self, max_items: int | None = 100):
         self.institution = "CAPES"
         self.max_items = max_items
 
-    async def parse(self, db, max_items: Optional[int] = None) -> Dict[str, Any]:
+    async def parse(self, db, max_items: int | None = None) -> dict[str, Any]:
         item_limit = self.max_items if max_items is None else max_items
 
         inserted_count = 0
@@ -110,7 +120,11 @@ class CapesParser:
                 program_urls = []
                 direct_editais = []
 
-            logger.info("Found %d CAPES program pages, %d direct editais", len(program_urls), len(direct_editais))
+            logger.info(
+                "Found %d CAPES program pages, %d direct editais",
+                len(program_urls),
+                len(direct_editais),
+            )
 
             # Insere editais listados diretamente na página principal
             for title, link, desc_text in direct_editais:
@@ -219,7 +233,7 @@ class CapesParser:
         soup = BeautifulSoup(r.text, "html.parser")
 
         results = []
-        for a in soup.select("a[href*=\".pdf\"]"):
+        for a in soup.select('a[href*=".pdf"]'):
             href = a.get("href", "")
             text = a.get_text(strip=True)
             if not text or not _is_main_edital(text):
@@ -242,7 +256,5 @@ if __name__ == "__main__":
     db = OpportunityDatabase(str(PROJECT_ROOT / "oportunidades.db"))
     parser = CapesParser(max_items=200)
     result = asyncio.run(parser.parse(db))
-    db.export_to_spreadsheet(
-        str(PROJECT_ROOT / "editais.csv"), str(PROJECT_ROOT / "editais.xlsx")
-    )
+    db.export_to_spreadsheet(str(PROJECT_ROOT / "editais.csv"), str(PROJECT_ROOT / "editais.xlsx"))
     logger.info("Done: %s", result)

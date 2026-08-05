@@ -4,7 +4,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +20,11 @@ class FinepParser:
     # Extraído da home quando possível; este é o valor atual (constante no template do site).
     _SITE_ID_FALLBACK = "222684"
     # A home expõe o template: href="/e/chamada-publica/{siteId}/${{item.id}}"
-    _SITE_ID_RE = re.compile(r'/e/[a-z0-9-]+/(\d+)/\$\{item\.id\}')
+    _SITE_ID_RE = re.compile(r"/e/[a-z0-9-]+/(\d+)/\$\{item\.id\}")
 
-    def __init__(self, max_items: Optional[int] = 50):
+    def __init__(self, max_items: int | None = 50):
         self.home_url = "https://www.finep.gov.br/"
-        self.api_url = (
-            "https://www.finep.gov.br/o/c/chamadapublicas"
-            "?sort=dataDePublicacao:desc&pageSize=250"
-        )
+        self.api_url = "https://www.finep.gov.br/o/c/chamadapublicas?sort=dataDePublicacao:desc&pageSize=250"
         self.institution = "FINEP"
         self.max_items = max_items
 
@@ -44,7 +41,7 @@ class FinepParser:
             logger.exception("Falha ao extrair siteId da home FINEP")
         return self._SITE_ID_FALLBACK
 
-    async def parse(self, db, max_items: Optional[int] = None) -> Dict[str, Any]:
+    async def parse(self, db, max_items: int | None = None) -> dict[str, Any]:
         import httpx
 
         item_limit = self.max_items if max_items is None else max_items
@@ -149,7 +146,5 @@ if __name__ == "__main__":
     db = OpportunityDatabase(str(PROJECT_ROOT / "oportunidades.db"))
     parser = FinepParser()
     result = asyncio.run(parser.parse(db))
-    db.export_to_spreadsheet(
-        str(PROJECT_ROOT / "editais.csv"), str(PROJECT_ROOT / "editais.xlsx")
-    )
+    db.export_to_spreadsheet(str(PROJECT_ROOT / "editais.csv"), str(PROJECT_ROOT / "editais.xlsx"))
     logger.info("Done: %s", result)

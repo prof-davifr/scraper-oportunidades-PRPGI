@@ -46,7 +46,7 @@ jobs:
           pip install ruff pytest pytest-asyncio pandas openpyxl
 
       - name: Run tests
-        run: pytest tests/ -v --tb=short
+        run: python -m pytest tests/ -v --tb=short
 
   build-windows:
     runs-on: windows-latest

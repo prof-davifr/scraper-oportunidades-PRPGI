@@ -21,11 +21,9 @@ def pdf_creation_date(data: bytes) -> str:
             m = re.match(r"(\d{4}-\d{2}-\d{2})", str(cd))
             if m:
                 return m.group(1)
-    except Exception:
+    except Exception:  # noqa: S110 — metadados ausentes/corrompidos; cai no fallback regex abaixo
         pass
     m = re.search(rb"/CreationDate\s*\(D:(\d{4})(\d{2})(\d{2})", data)
     if m:
-        return (
-            f"{m.group(1).decode()}-{m.group(2).decode()}-{m.group(3).decode()}"
-        )
+        return f"{m.group(1).decode()}-{m.group(2).decode()}-{m.group(3).decode()}"
     return ""

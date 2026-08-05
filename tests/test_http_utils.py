@@ -1,7 +1,7 @@
 """Testes para crawler/http_utils.py (fetch com retry e detecção de CAPTCHA)."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
@@ -67,7 +67,8 @@ def test_make_client_headers():
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            loop.create_task(client.aclose())
+            close_task = loop.create_task(client.aclose())  # fecha de forma assíncrona
+            close_task.add_done_callback(lambda t: None)  # evita warning de task pendente
         else:
             loop.run_until_complete(client.aclose())
     except RuntimeError:

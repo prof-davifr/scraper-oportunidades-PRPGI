@@ -195,9 +195,9 @@ class TestCapesParser:
         with patch("crawler.parsers.capes.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
             mock_client.__aenter__.return_value = mock_client
-            mock_client.get = AsyncMock(side_effect=httpx.HTTPStatusError(
-                "404", request=MagicMock(), response=MagicMock(status_code=404)
-            ))
+            mock_client.get = AsyncMock(
+                side_effect=httpx.HTTPStatusError("404", request=MagicMock(), response=MagicMock(status_code=404))
+            )
             mock_client_cls.return_value = mock_client
 
             result = await parser.parse(mock_db)

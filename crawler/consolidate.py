@@ -13,7 +13,7 @@ número detectável são agrupados apenas por título normalizado.
 import re
 import unicodedata
 from collections import Counter
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Normalização de título
@@ -46,7 +46,7 @@ def normalize_title(title: str) -> str:
 # Referência do edital: (tipo, número, ano)
 # ---------------------------------------------------------------------------
 
-_KIND_SPECS: List[Tuple[str, str]] = [
+_KIND_SPECS: list[tuple[str, str]] = [
     ("edital_conjunto", r"edital\s+conjunto"),
     ("edital", r"edital"),
     ("chamada_publica", r"chamada\s+p[úu]blica"),
@@ -71,7 +71,7 @@ def _kind_before(norm: str, end: int) -> str:
     return kms[-1].lastgroup if kms else "edital"
 
 
-def _bare_number_after_kind(norm: str, kmatch) -> Optional[re.Match]:
+def _bare_number_after_kind(norm: str, kmatch) -> re.Match | None:
     window = norm[kmatch.end() : kmatch.end() + 12]
     m = _NUM_BARE_RE.match(window)
     if m and m.start() <= 3:
@@ -79,7 +79,7 @@ def _bare_number_after_kind(norm: str, kmatch) -> Optional[re.Match]:
     return None
 
 
-def extract_ref(title: str) -> Optional[Tuple[str, str, str]]:
+def extract_ref(title: str) -> tuple[str, str, str] | None:
     """Retorna (tipo, número, ano) quando o título tem número de edital.
 
     Aceita "Edital nº 05/2024", "Edital 27/2024", "EDITAL 009/2026",
@@ -122,20 +122,55 @@ def extract_subject(title: str) -> str:
 # ---------------------------------------------------------------------------
 
 _RELATED_PREFIXES = (
-    "alteração", "alteracao", "retificação", "retificacao", "prorrogação",
-    "prorrogacao", "suspensão", "suspensao", "reabertura", "resultado",
-    "homologa", "lista de inscritos", "lista de inscrições", "lista das inscrições",
-    "lista das inscricoes", "relação", "relacao", "republicação", "republicacao",
-    "anexo", "comunicado", "aditivo", "errata", "esclarecimento", "cronograma",
-    "orientações", "orientacoes", "adesão", "adesao", "termo", "formulário",
-    "formulario", "modelo", "declaração", "declaracao",
+    "alteração",
+    "alteracao",
+    "retificação",
+    "retificacao",
+    "prorrogação",
+    "prorrogacao",
+    "suspensão",
+    "suspensao",
+    "reabertura",
+    "resultado",
+    "homologa",
+    "lista de inscritos",
+    "lista de inscrições",
+    "lista das inscrições",
+    "lista das inscricoes",
+    "relação",
+    "relacao",
+    "republicação",
+    "republicacao",
+    "anexo",
+    "comunicado",
+    "aditivo",
+    "errata",
+    "esclarecimento",
+    "cronograma",
+    "orientações",
+    "orientacoes",
+    "adesão",
+    "adesao",
+    "termo",
+    "formulário",
+    "formulario",
+    "modelo",
+    "declaração",
+    "declaracao",
 )
 
 # Marcadores que podem aparecer no assunto (após o número) indicando documento
 # relacionado: "… – RESULTADO FINAL", "… - Retificado", "… - Lista de inscritos".
 _SUBJECT_RELATED_STARTS = (
-    "resultado", "lista", "relação", "relacao", "retificad", "alterad",
-    "homologa", "anexo", "aviso de",
+    "resultado",
+    "lista",
+    "relação",
+    "relacao",
+    "retificad",
+    "alterad",
+    "homologa",
+    "anexo",
+    "aviso de",
 )
 
 
@@ -160,10 +195,31 @@ def is_related_doc(title: str) -> bool:
 # assunto de um documento é só isso, ele não forma grupo próprio — herda o
 # assunto dominante do edital.
 _VARIANT_WORDS = (
-    "retificad", "alterad", "prorrogad", "suspens", "reabertur", "resultado",
-    "homologa", "republicad", "comunicad", "anexo", "adesao", "adesão", "termo",
-    "lista", "relacao", "relação", "cronograma", "errata", "esclarecimento",
-    "aviso", "orienta", "formulario", "formulário", "modelo", "declar",
+    "retificad",
+    "alterad",
+    "prorrogad",
+    "suspens",
+    "reabertur",
+    "resultado",
+    "homologa",
+    "republicad",
+    "comunicad",
+    "anexo",
+    "adesao",
+    "adesão",
+    "termo",
+    "lista",
+    "relacao",
+    "relação",
+    "cronograma",
+    "errata",
+    "esclarecimento",
+    "aviso",
+    "orienta",
+    "formulario",
+    "formulário",
+    "modelo",
+    "declar",
 )
 
 
@@ -182,18 +238,18 @@ def _jaccard(a: str, b: str) -> float:
     return len(wa & wb) / len(wa | wb)
 
 
-def _primary_key(u: Dict[str, Any]) -> Tuple:
+def _primary_key(u: dict[str, Any]) -> tuple:
     pub = u.get("publication_date") or ""
     return (
-        u["_related"],            # edital principal antes de documentos relacionados
-        0 if pub else 1,          # com data de publicação primeiro
-        pub,                      # a mais antiga (a original) primeiro
-        -len(u["_subject"]),      # título com assunto mais descritivo primeiro
+        u["_related"],  # edital principal antes de documentos relacionados
+        0 if pub else 1,  # com data de publicação primeiro
+        pub,  # a mais antiga (a original) primeiro
+        -len(u["_subject"]),  # título com assunto mais descritivo primeiro
         u.get("id") or 0,
     )
 
 
-def _date_ordinal(value: str) -> Tuple[int, int, int]:
+def _date_ordinal(value: str) -> tuple[int, int, int]:
     """Converte ISO (YYYY-MM-DD) ou DD/MM/YYYY em tupla ordenável."""
     s = (value or "").strip()
     m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", s)
@@ -205,7 +261,7 @@ def _date_ordinal(value: str) -> Tuple[int, int, int]:
     return (0, 0, 0)
 
 
-def consolidate_editais(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def consolidate_editais(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Agrupa registros de um mesmo edital.
 
     Args:
@@ -221,7 +277,7 @@ def consolidate_editais(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             }
     """
     # 1) deduplica títulos idênticos (mesmo documento listado em várias páginas)
-    units: List[Dict[str, Any]] = []
+    units: list[dict[str, Any]] = []
     seen = set()
     for r in sorted(rows, key=lambda r: r.get("id") or 0):
         norm = normalize_title(r.get("title", ""))
@@ -237,13 +293,13 @@ def consolidate_editais(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         units.append(unit)
 
     # 2) agrupa por referência (instituição, tipo, número, ano)
-    by_ref: Dict[Tuple, List[Dict]] = {}
+    by_ref: dict[tuple, list[dict]] = {}
     for u in units:
         if u["_ref"]:
             by_ref.setdefault((u["institution"],) + u["_ref"], []).append(u)
 
-    final_groups: List[List[Dict]] = []
-    for key, grp in by_ref.items():
+    final_groups: list[list[dict]] = []
+    for _, grp in by_ref.items():
         subs_all = [u["_subject"] for u in grp if u["_subject"]]
         subs_core = [s for s in subs_all if not _is_variant_marker(s)]
         pool = subs_core or subs_all
@@ -255,7 +311,7 @@ def consolidate_editais(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
         # separa colisões reais de número (dois editais distintos com nº igual):
         # assunto muito diferente do dominante e "substantivo" forma grupo próprio.
-        subgroups: Dict[str, List[Dict]] = {}
+        subgroups: dict[str, list[dict]] = {}
         for u in grp:
             s = u["_subject"]
             if not s or _is_variant_marker(s) or _jaccard(s, canon) >= 0.3:
@@ -274,7 +330,12 @@ def consolidate_editais(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for grp in final_groups:
         primary = min(grp, key=_primary_key)
         related = [u for u in grp if u is not primary]
-        related.sort(key=lambda u: (_date_ordinal(u.get("publication_date") or ""), u.get("id") or 0))
+        related.sort(
+            key=lambda u: (
+                _date_ordinal(u.get("publication_date") or ""),
+                u.get("id") or 0,
+            )
+        )
         sort_date = max(
             (u.get("publication_date") or "" for u in grp),
             key=_date_ordinal,

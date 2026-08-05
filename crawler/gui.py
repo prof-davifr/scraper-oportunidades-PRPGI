@@ -9,9 +9,8 @@ import logging
 import queue
 import sys
 import threading
-from pathlib import Path
-
 import tkinter as tk
+from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 logger = logging.getLogger(__name__)
@@ -81,9 +80,7 @@ class EditaisApp:
 
         # Log
         ttk.Label(main, text="Progresso:").pack(anchor="w", padx=12)
-        self.log_box = scrolledtext.ScrolledText(
-            main, height=14, state="disabled", font=("Consolas", 9)
-        )
+        self.log_box = scrolledtext.ScrolledText(main, height=14, state="disabled", font=("Consolas", 9))
         self.log_box.pack(fill="both", expand=True, padx=12, pady=(0, 12))
 
     def _choose_dir(self) -> None:
@@ -125,9 +122,7 @@ class EditaisApp:
         self.log_queue.put(f"Pasta de saída: {out_dir}")
         self.log_queue.put("Iniciando coleta…")
 
-        thread = threading.Thread(
-            target=self._run_crawler, args=(out_dir,), daemon=True
-        )
+        thread = threading.Thread(target=self._run_crawler, args=(out_dir,), daemon=True)
         thread.start()
 
     def _run_crawler(self, out_dir: Path) -> None:
@@ -141,9 +136,7 @@ class EditaisApp:
 
             handler = _QHandler()
             handler.queue = self.log_queue
-            handler.setFormatter(
-                logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s")
-            )
+            handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s"))
             root_logger = logging.getLogger()
             root_logger.setLevel(logging.INFO)
             root_logger.addHandler(handler)
@@ -171,8 +164,7 @@ class EditaisApp:
         self.btn.configure(state="normal", text="Gerar Editais")
         messagebox.showinfo(
             "Concluído",
-            f"Planilha gerada em:\n{self.output_dir.get()}\n\n"
-            "Abra o arquivo editais.xlsx no Excel.",
+            f"Planilha gerada em:\n{self.output_dir.get()}\n\nAbra o arquivo editais.xlsx no Excel.",
         )
 
 
