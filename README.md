@@ -1,6 +1,6 @@
 # scraper-oportunidades-PRPGI
 
-Coletor de editais de fomento à pesquisa brasileiros — **CAPES, CNPq, FINEP, FAPESB, SETEC e MCTI** — que gera planilha Excel, CSV e página HTML.
+Coletor de editais de fomento à pesquisa brasileiros — **CAPES, CNPq, FINEP, FAPESB e SETEC** — que gera planilha Excel, CSV e página HTML.
 
 ## 👤 Para usuários finais (Windows, sem instalar nada)
 
@@ -10,7 +10,7 @@ Coletor de editais de fomento à pesquisa brasileiros — **CAPES, CNPq, FINEP, 
 4. Clique em **"Gerar Editais"** e aguarde o progresso.
 5. Abra o arquivo **`editais.xlsx`** no Excel.
 
-O programa baixa sozinho os dados das 6 fontes e salva ao lado dele:
+O programa baixa sozinho os dados das 5 fontes e salva ao lado dele:
 `editais.xlsx` (planilha), `editais.csv`, `editais.html` e `oportunidades.db`.
 
 > Requer internet. A primeira geração pode levar alguns minutos (sites governamentais são lentos).
@@ -70,7 +70,6 @@ A exportação **consolida** documentos do mesmo edital (edital + retificações
 - **FAPESB**: `date` da API do WordPress + prazo best-effort da página/PDF.
 - **CAPES**: data no nome do arquivo PDF (padrão SEI `DDMMYYYY_...`).
 - **SETEC**: metadados de criação do PDF (`pypdf`) — aproximação.
-- **MCTI**: quando disponível no texto.
 
 Registros existentes têm datas vazias preenchidas automaticamente nas execuções seguintes.
 
@@ -87,7 +86,6 @@ Registros existentes têm datas vazias preenchidas automaticamente nas execuçõ
   - **finep.py** — API REST, filtra chamadas abertas
   - **fapesb.py** — API do WordPress (categoria "Edital")
   - **setec.py** — blocos de edital (título + anexos) por ano; `_clean_title` limpa ruído
-  - **mcti.py** — links de editais do conteúdo principal/submenu
 
 ## Adicionar uma fonte
 

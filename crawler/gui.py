@@ -53,7 +53,7 @@ class EditaisApp:
         ttk.Label(
             main,
             text=(
-                "Coleta editais de CAPES, CNPq, FINEP, FAPESB, SETEC e MCTI "
+                "Coleta editais de CAPES, CNPq, FINEP, FAPESB e SETEC "
                 "e gera a planilha editais.xlsx ao lado deste programa."
             ),
             wraplength=660,

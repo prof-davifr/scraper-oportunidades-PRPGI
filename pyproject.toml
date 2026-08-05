@@ -1,7 +1,7 @@
 [project]
 name = "scraper-oportunidades-PRPGI"
 version = "0.5.0"
-description = "Coletor de editais de fomento à pesquisa (CAPES, CNPq, FINEP, FAPESB, SETEC, MCTI) com exportação CSV/Excel/HTML."
+description = "Coletor de editais de fomento à pesquisa (CAPES, CNPq, FINEP, FAPESB, SETEC) com exportação CSV/Excel/HTML."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}

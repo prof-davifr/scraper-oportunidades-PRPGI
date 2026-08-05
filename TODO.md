@@ -1,28 +1,33 @@
 # TODO — scraper-oportunidades-PRPGI
 
-Scraper de editais de fomento à pesquisa (CAPES, CNPq, FINEP, FAPESB, SETEC, MCTI).
+Scraper de editais de fomento à pesquisa (CAPES, CNPq, FINEP, FAPESB, SETEC).
 
-_Última atualização: 03/08/2026 (sessão: dados de lançamento + CNPq no novo site + limpeza CAPES + consolidação de editais)_
+_Última atualização: 04/08/2026 (sessão: remoção do MCTI — página de editais passou a exigir login)_
 
 ## Estado atual
 
-- Crawl completo: **03/08/2026** — **224 registros** no `oportunidades.db` (apenas 2025–2026; removidos EMBRAPII/CONFAP/BNDES e registros < 2025)
+- Crawl completo: **04/08/2026** — **434 registros** no `oportunidades.db` (MCTI removido; sem registros MCTI no banco)
 - Distribuição no banco:
-  - CAPES 158 · FINEP 27 · FAPESB 20 · CNPq 10 · SETEC 9
-  - Por ano: 2026 = 153 · 2025 = 71
-  - **MCTI: 0** (parser corrigido, aguardando site liberar do CAPTCHA)
-- **302 registros com data de lançamento** (CNPq 10/10, FINEP 36/36, CAPES 256/654)
-- Todos os 29 testes passam (`python -m pytest`).
+  - CAPES 313 · FINEP 36 · FAPESB 20 · CNPq 10 · SETEC 53
+  - **MCTI: removido do sistema** (página de editais atrás de login gov.br)
+- **133 registros com data de lançamento** (CNPq 10/10, FINEP 36/36, FAPESB 20/20, CAPES 67/313)
+- Todos os 46 testes passam (`python -m pytest`).
 
 ## Foco: FAPESB, CNPq, FINEP, CAPES, SETEC-MEC
 
 | Instituição | Registros | Estado | Última captura |
 |---|---|---|---|
-| CAPES | 158 | ✅ consistente; 174 com data (filenames SEI) | 03/08 |
-| SETEC | 9 | ✅ consistente; 29/53 com data (metadados PDF) | 03/08 |
-| FINEP | 27 | ✅ consistente; 27/27 com data | 03/08 |
-| FAPESB | 20 | ✅ consistente; 20/20 com data de lançamento (REST WP); 7/20 com prazo | 03/08 |
-| CNPq | 10 | ✅ **migrado para o novo site** (gov.br) — 10/10 com data | 03/08 |
+| CAPES | 313 | ✅ consistente; 67 com data (filenames SEI) | 04/08 |
+| SETEC | 53 | ✅ consistente; 0 com data (metadados PDF não aplicados nesta base) | 04/08 |
+| FINEP | 36 | ✅ consistente; 36/36 com data | 04/08 |
+| FAPESB | 20 | ✅ consistente; 20/20 com data de lançamento (REST WP); 7/20 com prazo | 04/08 |
+| CNPq | 10 | ✅ **migrado para o novo site** (gov.br) — 10/10 com data | 04/08 |
+
+## Sessão 04/08 — remoção do MCTI
+
+- **Decisão do usuário**: MCTI fora do escopo — a página de editais (`gov.br/mcti/pt-br/acesso-a-informacao/editais`) passou a responder **302 → `require_login`** (autenticação gov.br) e o link de referência (`acompanhe-o-mcti/editais-concursos-e-chamadas-publicas`) é **404**. Não há listagem pública de editais do MCTI (só notícias).
+- Removidos: entrada do `SOURCES` (`crawler/config.py`), arquivo `crawler/parsers/mcti.py`, testes do parser (46 passando), menções em `README.md`, `fontes.md`, `AGENTS.md`, `pyproject.toml` e `crawler/gui.py`. Banco: 0 registros MCTI (nada a apagar).
+- **Se o MCTI voltar a publicar listagem pública de editais, reavaliar re-inclusão.**
 
 ## Sessão 03/08 (tarde) — remoção da BNDES
 
@@ -130,7 +135,7 @@ _Última atualização: 03/08/2026 (sessão: dados de lançamento + CNPq no novo
   - Link principal: usa o link do PDF no título, senão o link "Edital"/"Chamada" da lista de anexos; ignora links de retificação/anexo/modelo.
   - CAPTCHA intermitente do gov.br/MEC contornado com retry + detecção (6 tentativas, espera crescente).
   - Obs.: SETEC não publica datas de lançamento — campo vazio.
-- [ ] **MCTI**: CAPTCHA intermitente — parser corrigido aguardando o site liberar para validar.
+- [x] **MCTI**: ~~CAPTCHA intermitente~~ — na verdade a página passou a exigir **login gov.br** (302 → `require_login`); parser **removido** do sistema em 04/08/2026 (ver sessão acima).
 - [ ] **CAPES**: 398/654 sem data (nome de arquivo sem DDMMYYYY). Explorar extração do texto do PDF via navegador (gov.br serve HTML para httpx).
 - [x] **FAPESB**: datas de lançamento resolvidas via API REST do WordPress (campo `date`).
 - [ ] **Ruff/CI**: 116 erros de lint pré-existentes — decidir limpeza ou ajuste do CI.
@@ -153,7 +158,7 @@ _Última atualização: 03/08/2026 (sessão: dados de lançamento + CNPq no novo
 ## Pendências
 
 - [ ] **SETEC**: `gov.br/mec` bloqueado por CAPTCHA anti-bot ("human visitor" + 429/403). Parser retorna 0. Reavaliar quando o bloqueio cair.
-- [ ] **MCTI**: site com CAPTCHA intermitente (rate-limit por IP). Parser corrigido e aguardando o site voltar para validar captura real.
+- [x] **MCTI**: ~~site com CAPTCHA intermitente~~ — parser **removido** em 04/08/2026 (página de editais atrás de login gov.br; sem listagem pública).
 - [ ] **Ruff/CI**: codebase tem 116 erros de lint pré-existentes (`ruff check .` falha). Decidir se vale limpar ou ajustar config do CI.
 - [ ] `pyproject.toml` dependencies desatualizadas (não incluem httpx/bs4; `main` não existe como entry point — verificar `[project.scripts]`).
 
@@ -170,8 +175,10 @@ _Última atualização: 03/08/2026 (sessão: dados de lançamento + CNPq no novo
 | 03/08/2026 | BNDES | Removida do sistema — 3 registros apagados |
 | 03/08/2026 | SETEC/FAPESB | Datas de publicação: FAPESB 20/20 (REST WP), SETEC 29/53 (metadados PDF); prazos FAPESB 7/20 |
 | 03/08/2026 | banco | Excluídos 328 registros < 2025 (550 → 224; 2026=153, 2025=71) |
+| 04/08/2026 | todas | Crawl completo ao vivo: processed=360, new=2 (CNPq), erros=1 (CAPES); banco 432 → **434** |
+| 04/08/2026 | MCTI | **Removido do sistema** — página de editais atrás de login gov.br (302 → require_login); 0 registros no banco |
 
 ## Fonte de referência
 
 - Guia de fontes: `fontes.md`
-- Fontes registradas em `crawler/config.py` (ordem: CAPES, CNPq, FINEP, FAPESB, SETEC, MCTI)
+- Fontes registradas em `crawler/config.py` (ordem: CAPES, CNPq, FINEP, FAPESB, SETEC)

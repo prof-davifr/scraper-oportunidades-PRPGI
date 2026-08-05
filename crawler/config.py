@@ -86,13 +86,6 @@ class Settings:
             url="https://www.gov.br/mec/pt-br/acesso-a-informacao/institucional/estrutura-organizacional/orgaos-especificos-singulares/secretaria-de-educacao-profissional/editais",
             description="Secretaria de Educação Profissional e Tecnológica (SETEC/MEC)",
         ),
-        Source(
-            name="mcti",
-            module="crawler.parsers.mcti",
-            class_name="MctiParser",
-            url="https://www.gov.br/mcti/pt-br/acompanhe-o-mcti/editais-concursos-e-chamadas-publicas",
-            description="Ministério da Ciência, Tecnologia e Inovação (MCTI)",
-        ),
     ])
 
     def source_names(self) -> list[str]:

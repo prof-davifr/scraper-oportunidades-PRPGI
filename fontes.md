@@ -9,7 +9,6 @@ Guia de links para busca de oportunidades de fomento, bolsas e editais de pesqui
 | **Federal** | SETEC/MEC | Editais de Educação Profissional e Tecnológica | [Acessar Editais](https://www.gov.br/mec/pt-br/acesso-a-informacao/institucional/estrutura-organizacional/orgaos-especificos-singulares/secretaria-de-educacao-profissional/editais) |
 | **Federal** | FINEP | Chamadas Abertas - Inovação e Infraestrutura | [Acessar Oportunidades](https://www.finep.gov.br/oportunidades) |
 | **Federal** | CAPES | Pós-Graduação, Editais e Bolsas | [Acessar Editais](https://www.gov.br/capes/pt-br/assuntos/editais-e-resultados-capes) |
-| **Federal** | MCTI | Painel de Editais - Governo Federal | [Acessar Painel](https://www.gov.br/mcti/pt-br/acesso-a-informacao/editais) |
 | **Inovação** | SEBRAE | Editais Nacionais - Consultoria e Inovação | [Acessar Editais](https://sebrae.com.br/sites/PortalSebrae/editais) |
 | **Tecnologia/Redes** | RNP | Pesquisa e Redes - Grupos de Trabalho | [Acessar Chamadas](https://www.rnp.br/inovacao/editais-de-pesquisa-e-desenvolvimento) |
 | **Estadual (BA)** | FAPESB | Editais Bahia (FAP Bahia) | [Acessar Editais](https://www.fapesb.ba.gov.br/category/edital/) |

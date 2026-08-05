@@ -206,39 +206,6 @@ class TestCapesParser:
         assert result["new"] == 0
 
 
-# ---- MctiParser tests ----
-class TestMctiParser:
-    @pytest.mark.asyncio
-    async def test_parse_returns_expected_keys(self):
-        from crawler.parsers.mcti import MctiParser
-
-        parser = MctiParser(max_items=5)
-        mock_db = MagicMock()
-        mock_db.add_opportunity_with_result.return_value = "inserted"
-
-        html = """<html><body>
-          <main>
-            <a href="https://www.gov.br/mcti/pt-br/acesso-a-informacao/editais/edital-no-66-2024-sei-mcti">EDITAL DE CHAMAMENTO PÚBLICO Nº 66/2024/SEI-MCTI</a>
-          </main>
-          <ul class="submenu navTree">
-            <li><a href="https://www.gov.br/mcti/pt-br/acesso-a-informacao/editais/edital-no-144-2020-sei-mctic">EDITAL DE CHAMAMENTO PÚBLICO Nº 144/2020</a></li>
-          </ul>
-        </body></html>"""
-
-        with patch("crawler.parsers.mcti.make_client") as mock_make:
-            mock_make.return_value.__aenter__ = AsyncMock()
-            mock_make.return_value.__exit__ = AsyncMock(return_value=False)
-            with patch(
-                "crawler.parsers.mcti.fetch_text",
-                new=AsyncMock(return_value=html),
-            ):
-                result = await parser.parse(mock_db)
-
-        assert result["institution"] == "MCTI"
-        assert result["processed"] == 2
-        assert result["new"] == 2
-
-
 # ---- FapesbParser tests ----
 class TestFapesbParser:
     @pytest.mark.asyncio
@@ -356,8 +323,7 @@ class TestConfig:
         assert "capes" in s.source_names()
         assert "fapesb" in s.source_names()
         assert "setec" in s.source_names()
-        assert "mcti" in s.source_names()
-        assert len(s.source_names()) == 6
+        assert len(s.source_names()) == 5
 
     def test_get_source_find(self):
         from crawler.config import Settings
