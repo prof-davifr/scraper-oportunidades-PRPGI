@@ -1,29 +1,86 @@
 # TODO — scraper-oportunidades-PRPGI
 
-Scraper de editais de fomento à pesquisa (CAPES, CNPq, FINEP, FAPESB, SETEC).
+Coletor de editais de fomento à pesquisa (CAPES, CNPq, FINEP, FAPESB, SETEC) —
+banco SQLite persistido no repositório, exports CSV/XLSX/HTML e publicação
+diária no GitHub Pages.
 
-_Última atualização: 04/08/2026 (sessão: remoção do MCTI — página de editais passou a exigir login)_
+_Última atualização: 31/08/2026 (sessão: revisão do backlog depois de 26 dias de crawl automático)_
 
-## Estado atual
+---
 
-- Crawl completo: **04/08/2026** — **434 registros** no `oportunidades.db` (MCTI removido; sem registros MCTI no banco)
-- Distribuição no banco:
-  - CAPES 313 · FINEP 36 · FAPESB 20 · CNPq 10 · SETEC 53
-  - **MCTI: removido do sistema** (página de editais atrás de login gov.br)
-- **133 registros com data de lançamento** (CNPq 10/10, FINEP 36/36, FAPESB 20/20, CAPES 67/313)
-- Todos os 46 testes passam (`python -m pytest`).
+## Estado atual (31/08/2026)
 
-## Foco: FAPESB, CNPq, FINEP, CAPES, SETEC-MEC
+- **475 registros** no `oportunidades.db` de `origin/main` (eram 434 em 04/08).
+- Crawl de 31/08 (run `33422299637`, 3m58s): `processed=375 new=0 duplicates=375
+  errors=0`, `db_total=475` — todas as cinco fontes responderam sem erro.
+- **140/475 com data de lançamento**; **43/475 com prazo de inscrição**.
 
-| Instituição | Registros | Estado | Última captura |
+| Instituição | Registros | Com data | Com prazo |
 |---|---|---|---|
-| CAPES | 313 | ✅ consistente; 67 com data (filenames SEI) | 04/08 |
-| SETEC | 53 | ✅ consistente; 0 com data (metadados PDF não aplicados nesta base) | 04/08 |
-| FINEP | 36 | ✅ consistente; 36/36 com data | 04/08 |
-| FAPESB | 20 | ✅ consistente; 20/20 com data de lançamento (REST WP); 7/20 com prazo | 04/08 |
-| CNPq | 10 | ✅ **migrado para o novo site** (gov.br) — 10/10 com data | 04/08 |
+| CAPES | 346 | 67 | 0 |
+| SETEC | 56 | 0 | 0 |
+| FINEP | 38 | 38 | 25 |
+| FAPESB | 20 | 20 | 7 |
+| CNPq | 15 | 15 | 11 |
 
-## Sessão 04/08 — repositório público + crawl diário + GitHub Pages
+- Último commit de **código**: 05/08/2026 (`856531d`). De 06/08 para cá o
+  repositório só recebeu commits automáticos de crawl (25 commits).
+- ⚠️ **A cópia local está 27 commits atrás de `origin/main`** — o robô do
+  `crawl.yml` comita banco e exports direto no remoto. Dar `git pull` antes de
+  mexer em qualquer coisa, senão os exports locais (05/08) atropelam os do robô.
+- 46 testes passando (`python -m pytest`); `ruff check .` e `ruff format --check .` limpos.
+
+## Backlog
+
+- [ ] **CAPES — 279/346 registros sem data de lançamento** (só há data quando o nome do arquivo SEI traz `DDMMYYYY_`).
+      É a maior lacuna da página, que ordena e filtra por recência. Explorar a
+      leitura do texto do PDF — o gov.br serve HTML para o `httpx`, então precisa
+      de outra estratégia de download. (Era 398/654 em 04/08; o denominador caiu
+      com a limpeza de resultados de seleção.)
+- [ ] **Editais vencidos nunca saem da página** — os 475 registros estão com `status = 'Aberta'` e só 43 têm prazo.
+      Definir a regra de encerramento (prazo vencido → mudança de `status` ou
+      filtro no export) antes de divulgar mais o link para a comunidade.
+- [ ] **SETEC — 0/56 registros com data**, embora a extração por metadados de PDF tenha chegado a 29/53 em 03/08.
+      Verificar se `crawler/pdf_utils.py` ainda roda no crawl diário ou se os
+      links dos PDFs morreram (404 no gov.br).
+- [ ] **FINEP lista 9 chamadas de 2015–2024** como "aberta" na API (a mais antiga é de 13/10/2015).
+      O corte "só de 2025 em diante" foi limpeza manual em 03/08, nunca virou
+      regra do pipeline — implementar o filtro na ingestão.
+- [ ] **CI parado desde 05/08/2026** — o `ci.yml` só dispara em push, e o push do bot não re-dispara workflows.
+      Lint, testes e build do exe Windows não rodam há 26 dias. Avaliar um
+      `schedule` no `ci.yml` ou chamar `ruff`/`pytest` dentro do `crawl.yml`.
+- [ ] **Actions em Node 20 depreciado** — `checkout@v4`, `setup-python@v5`, `upload-artifact@v4` e `deploy-pages@v4`.
+      Já rodam forçados em Node 24, com aviso em toda execução. Atualizar as versões.
+- [ ] **MCTI** — reavaliar a re-inclusão se voltar a publicar listagem pública de editais (hoje: 302 → `require_login`).
+
+## Concluído (ago/2026)
+
+- [x] **Crawl diário + Pages consolidado** — 32 de 33 execuções verdes desde
+      05/08, a última em **31/08/2026** (run `33422299637`, 3m58s). A única falha
+      (06/08, run `31103764101`) foi timeout do `deploy-pages`; o crawl em si
+      passou. Página no ar: `https://prof-davifr.github.io/scraper-oportunidades-PRPGI/`.
+- [x] **Ruff limpo** — `ruff check .` responde "All checks passed!". Os 116 erros
+      de lint pré-existentes foram resolvidos em `b1323f4` (04/08: `line-length
+      120` + ignores para tipografia PT-BR). O item estava duplicado neste
+      arquivo, em duas seções "Pendências" — unificado aqui.
+- [x] **`pyproject.toml` em dia** — `dependencies` já traz `httpx` e
+      `beautifulsoup4` (além de pandas, openpyxl e pypdf), e os dois entry points
+      existem de fato: `crawler.main:main` (`crawler/main.py:200`) e
+      `crawler.gui:main` (`crawler/gui.py:171`).
+- [x] **SETEC voltou a coletar** — no crawl de 31/08 processou 53 itens com
+      `errors=0`, e o banco tem 56 registros (eram 53 em 04/08). O CAPTCHA do
+      `gov.br/mec` não está mais bloqueando as rodadas agendadas.
+- [x] **FAPESB** — datas de lançamento resolvidas pela API REST do WordPress
+      (campo `date`): 20/20.
+- [x] **MCTI removido** (04/08) — página de editais atrás de login gov.br.
+- [x] **Sobre em pop-up + identidade visual** (05/08) — símbolo IFBA no topo do
+      HTML e subtítulo "Assessoria de Ciência de Dados - NPP - PRPGI / IFBA".
+
+---
+
+## Histórico de sessões
+
+### Sessão 04/08 — repositório público + crawl diário + GitHub Pages
 
 - **Decisão do usuário**: disponibilizar para a PRPGI/IFBA — repo público, banco persistido, atualização automática diária, HTML público via Pages.
 - **Plano salvo em `PLANO_DEPLOY.md`** (arquitetura, tarefas, riscos).
@@ -35,32 +92,32 @@ _Última atualização: 04/08/2026 (sessão: remoção do MCTI — página de ed
 - **Banco inicial versionado**: 434 registros (04/08).
 - Página pública: `https://prof-davifr.github.io/scraper-oportunidades-PRPGI/`.
 
-## Sessão 04/08 — remoção do MCTI
+### Sessão 04/08 — remoção do MCTI
 
 - **Decisão do usuário**: MCTI fora do escopo — a página de editais (`gov.br/mcti/pt-br/acesso-a-informacao/editais`) passou a responder **302 → `require_login`** (autenticação gov.br) e o link de referência (`acompanhe-o-mcti/editais-concursos-e-chamadas-publicas`) é **404**. Não há listagem pública de editais do MCTI (só notícias).
 - Removidos: entrada do `SOURCES` (`crawler/config.py`), arquivo `crawler/parsers/mcti.py`, testes do parser (46 passando), menções em `README.md`, `fontes.md`, `AGENTS.md`, `pyproject.toml` e `crawler/gui.py`. Banco: 0 registros MCTI (nada a apagar).
 - **Se o MCTI voltar a publicar listagem pública de editais, reavaliar re-inclusão.**
 
-## Sessão 03/08 (tarde) — remoção da BNDES
+### Sessão 03/08 (tarde) — remoção da BNDES
 
 - **Decisão do usuário**: BNDES fora do escopo.
 - Removidos: entrada do `SOURCES` (`crawler/config.py`), arquivo `crawler/parsers/bndes.py`, testes do parser (42 passando), 3 registros do banco e menções em `README.md`, `fontes.md`, `AGENTS.md`.
 - Exports regenerados: 550 registros.
 
-## Sessão 03/08 (tarde) — remoção da CONFAP
+### Sessão 03/08 (tarde) — remoção da CONFAP
 
 - **Decisão do usuário**: CONFAP não publica editais, só notícias — fora do escopo.
 - Removidos: entrada do `SOURCES` (`crawler/config.py`), arquivo `crawler/parsers/confap.py`, testes do parser (44 passando), 8 registros do banco e menções em `README.md`, `fontes.md`, `AGENTS.md`.
 - Exports regenerados: 553 registros.
 
-## Sessão 03/08 (tarde) — exclusão de registros anteriores a 2025
+### Sessão 03/08 (tarde) — exclusão de registros anteriores a 2025
 
 - **Decisão do usuário**: manter apenas editais de 2025 em diante.
 - **328 registros excluídos** (CAPES 275, SETEC 44, FINEP 9): critério = ano extraído da data de publicação ou, na ausência, do título ("nº X/YYYY"), do nome do arquivo (SEI `DDMMYYYY_...`, `..._2024_...`) ou do caminho da URL (`editais/2026`, `edital-2023`). 0 registros ficaram sem classificação.
 - Total: 550 → **224 registros** (2026 = 153, 2025 = 71).
 - Exports regenerados.
 
-## Sessão 03/08 (tarde) — datas para SETEC e FAPESB
+### Sessão 03/08 (tarde) — datas para SETEC e FAPESB
 
 - **Objetivo**: FAPESB e SETEC não publicavam datas de lançamento (campos vazios).
 - **FAPESB reescrita** (`crawler/parsers/fapesb.py`): migrada do Playwright para a **API REST do WordPress** (`wp-json/wp/v2/posts?categories=1`, categoria "Edital") — título, link e **data de publicação** (`date`) estáveis, sem navegador. Prazo de inscrição best-effort: o widget "⏰ Início/Encerramento" é template fixo do site (mesmas datas em todas as páginas — NÃO usado); prazos reais extraídos do corpo da página ("encerra-se em", "Após as 17h do dia") ou do cronograma no PDF do edital ("Encerramento do prazo..."). Filtro de ano ≥ 2025 descarta datas velhas do rodapé (2022/2024).
@@ -68,19 +125,19 @@ _Última atualização: 04/08/2026 (sessão: remoção do MCTI — página de ed
 - **Resultado**: FAPESB **20/20 com data** (7/20 com prazo); SETEC **29/53 com data** (restante = PDFs com link morto 404 no gov.br). Registros FAPESB antigos em CAIXA ALTA sem data removidos (sósias com data).
 - Testes: parser FAPESB reescrito (httpx mock); 43 passando.
 
-## Sessão 03/08 (tarde) — fix links FINEP
+### Sessão 03/08 (tarde) — fix links FINEP
 
 - **Problema**: links das chamadas FINEP apontavam para o padrão antigo `finep.gov.br/oportunidades#!/chamada-publica/{id}`; o site atual usa `finep.gov.br/e/chamada-publica/{siteId}/{id}`.
 - **Parser** (`crawler/parsers/finep.py`): extrai o `siteId` do Liferay a partir da home (regex do template `href="/e/chamada-publica/{siteId}/${item.id}"`), com fallback `222684` (valor atual). Teste do link adicionado (17 testes de parser passando).
 - **Banco**: 36 links FINEP migrados para o novo formato (uid recalculado para manter o dedup); exports regenerados. Links validados (HTTP 200).
 
-## Sessão 03/08 (tarde) — remoção da EMBRAPII
+### Sessão 03/08 (tarde) — remoção da EMBRAPII
 
 - **Decisão do usuário**: EMBRAPII fora do escopo do scraper.
 - Removidos: entrada do `SOURCES` (`crawler/config.py`), arquivo `crawler/parsers/embrapii.py`, testes do parser (46 passando), 29 registros do banco e menções em `README.md`, `fontes.md`, `AGENTS.md`.
 - Exports regenerados: 561 registros → **231 grupos** (consolidados).
 
-## Sessão 03/08 (tarde) — consolidação de editais
+### Sessão 03/08 (tarde) — consolidação de editais
 
 - **Objetivo**: um edital aparecia várias vezes na lista (duplicatas do mesmo PDF em páginas de programa + atualizações: alteração, retificação, prorrogação, lista de inscritos).
 - **Novo módulo `crawler/consolidate.py`**: identifica o edital por instituição + tipo (edital, edital conjunto, chamada...) + número/ano, extrai o assunto e agrupa:
@@ -94,14 +151,14 @@ _Última atualização: 04/08/2026 (sessão: remoção do MCTI — página de ed
 - **Testes**: `tests/test_consolidate.py` (+19); 48 passando.
 - Obs.: crawl SETEC rodando em paralelo (outra sessão) alterou o banco durante a sessão — exports regenerados refletem o estado no momento da geração.
 
-## Sessão 03/08 (tarde) — limpeza de resultados CAPES
+### Sessão 03/08 (tarde) — limpeza de resultados CAPES
 
 - **Objetivo**: remover do CAPES os documentos que são apenas **resultados** de seleção (não são editais/oportunidades).
 - **Parser** (`crawler/parsers/capes.py`): `_ANNEX_KEYWORDS` ganhou `resultado` e `homologa` — filtra títulos como "Resultado final do Edital nº ...", "Resultado preliminar", "Retificação do Resultado", "Edital nº X - Resultado da Renovação de Projetos", "Lista de inscrições homologadas" etc.
 - **Banco**: 221 registros CAPES removidos (215 com "resultado" + 6 "Lista de inscrições homologadas") — CAPES 654 → 433; total 1253 → 1032.
 - Exports regenerados (`editais.csv`, `editais.xlsx`, `editais.html`).
 
-## Sessão 03/08 (tarde) — dados de lançamento + CNPq novo
+### Sessão 03/08 (tarde) — dados de lançamento + CNPq novo
 
 - **Objetivo do usuário**: página com oportunidades recentes de financiamento p/ IFBA, com **data de lançamento** na planilha.
 - **Export**: coluna "Data de Lançamento" adicionada ao CSV/XLSX; HTML com coluna Lançamento, destaque de recentes (≤60 dias) e filtro 30/60/90 dias; ordenação por recência.
@@ -112,7 +169,7 @@ _Última atualização: 04/08/2026 (sessão: remoção do MCTI — página de ed
 - **`add_opportunity_with_result`**: em caso de duplicata, preenche datas vazias do registro existente (UPDATE via COALESCE).
 - Teste do CNPq atualizado (mock por seletor).
 
-### SETEC — reparo em 03/08
+#### SETEC — reparo em 03/08
 
 - Site MEC aplica **CAPTCHA intermitente** ("human visitor") — `_goto_with_retry` reescrito com 6 tentativas, espera crescente (8–48s) e detecção de bloqueio.
 - Estrutura da página mudou: links de ano agora em `.../secretaria-de-educacao-profissional/editais/2026` (antes `/centrais-de-conteudo/editais/2026`) — seletor atualizado.
@@ -122,12 +179,12 @@ _Última atualização: 04/08/2026 (sessão: remoção do MCTI — página de ed
 - Resultado: 344 itens / 301 novos capturados (2026 → anterior-a-2021).
 - Obs.: 151 registros antigos (16/06) são de outra seção (SESU/UNESCO, ex. TR_21_2026_SV_914Brz1102) — mantidos como complemento; títulos são nomes de arquivo.
 
-## Sessões anteriores (03/08)
+### Sessões anteriores (03/08)
 
 - Ambiente restaurado (playwright/pandas/numpy corrompidos); `main.py` com bootstrap de `sys.path`.
 - CAPES/CNPq/BNDES/MCTI reparados; 150 registros-lixo do MCTI removidos.
 
-## Distribuição — exe Windows (03/08, noite)
+### Distribuição — exe Windows (03/08, noite)
 
 - **Objetivo**: outras pessoas (nível técnico zero) rodarem e gerarem suas tabelas — exe Windows com duplo clique.
 - **Playwright ELIMINADO**: todas as fontes funcionam com httpx puro. Parsers reescritos: cnpq, mcti, setec → httpx+BS4 (fapesb/capes/finep já eram). Exe sem browser (~30 MB, sem `playwright install`).
@@ -139,21 +196,18 @@ _Última atualização: 04/08/2026 (sessão: remoção do MCTI — página de ed
 - **pyproject**: deps corretas (httpx, bs4, pandas, openpyxl, pypdf; sem playwright).
 - Testes: +5 (http_utils); parsers atualizados p/ httpx. 47 passando.
 
-## Pendências
+### SETEC — reparo em 04/08
 
-- [x] **SETEC — REFAZIDO** (URL: `gov.br/mec/pt-br/.../secretaria-de-educacao-profissional/editais`):
+- [x] **SETEC — parser refeito** (URL: `gov.br/mec/pt-br/.../secretaria-de-educacao-profissional/editais`):
   - Parser reescrito: extrai **blocos de edital** (título `<p>` + lista de anexos `<ul>`) em vez de cada PDF como registro. 495 registros → **53 editais** com títulos completos e link do PDF principal.
   - `_clean_title`: remove sufixos de navegação ("Acesse o edital", "accessibility-anchor"), anexos/resultados concatenados e duplicação de número — preservando títulos legítimos (ex.: "art. 13, Anexo I, do Decreto").
   - Link principal: usa o link do PDF no título, senão o link "Edital"/"Chamada" da lista de anexos; ignora links de retificação/anexo/modelo.
   - CAPTCHA intermitente do gov.br/MEC contornado com retry + detecção (6 tentativas, espera crescente).
   - Obs.: SETEC não publica datas de lançamento — campo vazio.
 - [x] **MCTI**: ~~CAPTCHA intermitente~~ — na verdade a página passou a exigir **login gov.br** (302 → `require_login`); parser **removido** do sistema em 04/08/2026 (ver sessão acima).
-- [ ] **CAPES**: 398/654 sem data (nome de arquivo sem DDMMYYYY). Explorar extração do texto do PDF via navegador (gov.br serve HTML para httpx).
 - [x] **FAPESB**: datas de lançamento resolvidas via API REST do WordPress (campo `date`).
-- [ ] **Ruff/CI**: 116 erros de lint pré-existentes — decidir limpeza ou ajuste do CI.
-- [ ] `pyproject.toml` dependencies desatualizadas (faltam httpx/bs4; entry point `main` inexistente).
 
-## Sessão de 03/08/2026 — o que foi feito
+### Sessão de 03/08/2026 — o que foi feito
 
 - [x] **Ambiente restaurado**: `playwright`, `pandas`, `numpy` estavam corrompidos no site-packages (só `dist-info`, sem os arquivos). Reinstalados do zero + `playwright install chromium`.
 - [x] **`crawler/main.py`**: faltava bootstrap de `sys.path` — `python crawler/main.py` falhava com `ModuleNotFoundError`.
@@ -166,13 +220,6 @@ _Última atualização: 04/08/2026 (sessão: remoção do MCTI — página de ed
 - [x] `requirements.txt`: adicionados `httpx`, `beautifulsoup4`, `pytest`, `pytest-asyncio`.
 - [x] Exports regenerados (`editais.csv`, `editais.xlsx`, `editais.html`).
 - [x] README.md atualizado (citava apenas FINEP + CNPq).
-
-## Pendências
-
-- [ ] **SETEC**: `gov.br/mec` bloqueado por CAPTCHA anti-bot ("human visitor" + 429/403). Parser retorna 0. Reavaliar quando o bloqueio cair.
-- [x] **MCTI**: ~~site com CAPTCHA intermitente~~ — parser **removido** em 04/08/2026 (página de editais atrás de login gov.br; sem listagem pública).
-- [ ] **Ruff/CI**: codebase tem 116 erros de lint pré-existentes (`ruff check .` falha). Decidir se vale limpar ou ajustar config do CI.
-- [ ] `pyproject.toml` dependencies desatualizadas (não incluem httpx/bs4; `main` não existe como entry point — verificar `[project.scripts]`).
 
 ## Log de execuções
 
@@ -189,6 +236,9 @@ _Última atualização: 04/08/2026 (sessão: remoção do MCTI — página de ed
 | 03/08/2026 | banco | Excluídos 328 registros < 2025 (550 → 224; 2026=153, 2025=71) |
 | 04/08/2026 | todas | Crawl completo ao vivo: processed=360, new=2 (CNPq), erros=1 (CAPES); banco 432 → **434** |
 | 04/08/2026 | MCTI | **Removido do sistema** — página de editais atrás de login gov.br (302 → require_login); 0 registros no banco |
+| 05/08/2026 | deploy | Repo público + Pages no ar; Sobre em pop-up e identidade IFBA/NPP no HTML |
+| 06/08 a 31/08/2026 | todas (Actions) | Crawl diário automático: 33 execuções, 32 verdes (1 timeout de deploy em 06/08); banco 434 → **475** |
+| 31/08/2026 | todas | processed=375, new=0, duplicates=375, erros=0; db_total=**475** (CAPES 346, SETEC 56, FINEP 38, FAPESB 20, CNPq 15) |
 
 ## Fonte de referência
 
