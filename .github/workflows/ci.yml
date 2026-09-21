@@ -5,12 +5,18 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # O crawl diário faz push em main com o GITHUB_TOKEN, e um push assim não
+  # dispara workflow nenhum. Sem os dois gatilhos abaixo, o CI fica parado
+  # entre dois commits meus — foi o que aconteceu de 05/08 a 20/09/2026.
+  schedule:
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -32,7 +38,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -53,7 +59,7 @@ jobs:
     needs: [test]
     if: github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v5
