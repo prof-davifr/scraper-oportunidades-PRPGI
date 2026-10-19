@@ -151,6 +151,40 @@ class OpportunityDatabase:
             conn.commit()
             return cur.rowcount
 
+    def get_undated(self, institution: str, limit: int) -> list[tuple[int, str]]:
+        """Até `limit` registros (id, link) da instituição sem data de publicação.
+
+        A ordem é aleatória para que links mortos não ocupem sempre a cota da rodada.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT id, link FROM opportunities
+                WHERE institution = ?
+                  AND (publication_date IS NULL OR publication_date = '')
+                  AND link IS NOT NULL AND link <> ''
+                ORDER BY RANDOM()
+                LIMIT ?
+                """,
+                (institution, limit),
+            )
+            return [(int(i), str(link)) for i, link in cur.fetchall()]
+
+    def set_publication_date_if_empty(self, row_id: int, iso_date: str) -> bool:
+        """Grava a data de publicação só se o registro ainda não tiver uma."""
+        with sqlite3.connect(self.db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                UPDATE opportunities SET publication_date = ?
+                WHERE id = ? AND (publication_date IS NULL OR publication_date = '')
+                """,
+                (iso_date, row_id),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+
     def _format_date(self, value) -> str:
         """Converte data ISO (YYYY-MM-DD) para DD/MM/YYYY para exibição.
         Aceita também timestamps ISO completos (YYYY-MM-DDTHH:MM:SS...)."""

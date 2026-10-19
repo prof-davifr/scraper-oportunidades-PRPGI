@@ -15,6 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from crawler.http_utils import fetch_text, make_client
+from crawler.pdf_utils import backfill_pdf_dates
 
 # Palavras que identificam o título de um edital/chamada
 _EDITAL_KEYWORDS = (
@@ -244,6 +245,12 @@ class SetecParser:
                     except Exception as e:
                         error_count += 1
                         logger.exception("Error parsing SETEC item: %s", e)
+
+            # A página não traz data; a data de criação do PDF serve de aproximação
+            try:
+                await backfill_pdf_dates(client, db, self.institution)
+            except Exception:
+                logger.exception("SETEC: falha ao buscar datas nos PDFs")
 
         return {
             "institution": self.institution,

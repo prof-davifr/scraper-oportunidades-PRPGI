@@ -15,6 +15,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from crawler.http_utils import make_client
+from crawler.pdf_utils import backfill_pdf_dates
 
 _MAIN_URL = "https://www.gov.br/capes/pt-br/assuntos/editais-e-resultados-capes"
 _HEADERS = {
@@ -190,6 +192,13 @@ class CapesParser:
 
             tasks = [visit(name, url) for name, url in program_urls]
             await asyncio.gather(*tasks)
+
+        # Sem DDMMYYYY no nome do arquivo, a data de criação do PDF serve de aproximação
+        try:
+            async with make_client() as pdf_client:
+                await backfill_pdf_dates(pdf_client, db, self.institution)
+        except Exception:
+            logger.exception("CAPES: falha ao buscar datas nos PDFs")
 
         return {
             "institution": self.institution,
