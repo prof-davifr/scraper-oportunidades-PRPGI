@@ -87,6 +87,61 @@ class TestFinepParser:
         assert "duplicates" in result
         assert "errors" in result
 
+    @pytest.mark.asyncio
+    async def test_parse_skips_calls_published_before_2025(self):
+        from crawler.parsers.finep import FinepParser
+
+        parser = FinepParser(max_items=None)
+        mock_db = MagicMock()
+        mock_db.add_opportunity_with_result.return_value = "inserted"
+        mock_db.delete_published_before.return_value = 0
+
+        fake_response = {
+            "items": [
+                {
+                    "titulo": "Chamada Pública Bilateral Finep-CDTI",
+                    "situacao": {"key": "aberta"},
+                    "id": 1,
+                    "dataDePublicacao": "2015-10-13T00:00:00Z",
+                },
+                {
+                    "titulo": "Chamada de 2024",
+                    "situacao": {"key": "aberta"},
+                    "id": 2,
+                    "dataDePublicacao": "2024-12-31",
+                },
+                {
+                    "titulo": "Chamada de 2025",
+                    "situacao": {"key": "aberta"},
+                    "id": 3,
+                    "dataDePublicacao": "2025-01-02T10:00:00Z",
+                },
+                {
+                    "titulo": "Chamada sem data",
+                    "situacao": {"key": "aberta"},
+                    "id": 4,
+                },
+            ]
+        }
+
+        mock_response = MagicMock()
+        mock_response.json = MagicMock(return_value=fake_response)
+        mock_response.raise_for_status = MagicMock()
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client_cls.return_value = mock_client
+
+            result = await parser.parse(mock_db)
+
+        titles = [c.kwargs["title"] for c in mock_db.add_opportunity_with_result.call_args_list]
+        assert titles == ["Chamada de 2025", "Chamada sem data"]
+        assert result["processed"] == 2
+        assert result["errors"] == 0
+        mock_db.delete_published_before.assert_called_once_with("FINEP", "2025-01-01")
+
 
 # ---- CnpqParser tests ----
 class TestCnpqParser:

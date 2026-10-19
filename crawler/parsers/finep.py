@@ -13,6 +13,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# A API da FINEP mantém como "aberta" chamadas antigas (a mais velha é de
+# 13/10/2015). O banco guarda só editais de 2025 em diante (corte de 03/08/2026),
+# então a ingestão descarta o que foi publicado antes deste ano.
+MIN_PUBLICATION_YEAR = 2025
+
 
 class FinepParser:
     # siteId do Liferay da FINEP, usado nas URLs públicas de chamada:
@@ -73,6 +78,7 @@ class FinepParser:
         open_items = [item for item in items if item.get("situacao", {}).get("key") == "aberta"]
 
         processed = 0
+        skipped_old = 0
         for item in open_items:
             if item_limit is not None and processed >= item_limit:
                 break
@@ -100,6 +106,10 @@ class FinepParser:
                         if m:
                             pub_date = m.group(0)
 
+                if pub_date and int(pub_date[:4]) < MIN_PUBLICATION_YEAR:
+                    skipped_old += 1
+                    continue
+
                 deadline = ""
                 prazo = item.get("prazoProposto", "")
                 if prazo:
@@ -125,6 +135,16 @@ class FinepParser:
             except Exception as e:
                 error_count += 1
                 logger.exception("Error parsing FINEP item: %s", e)
+
+        if skipped_old:
+            logger.info("FINEP: %s chamadas anteriores a %s ignoradas", skipped_old, MIN_PUBLICATION_YEAR)
+        # Limpa registros antigos que entraram antes de o corte existir na ingestão
+        try:
+            removed = db.delete_published_before(self.institution, f"{MIN_PUBLICATION_YEAR}-01-01")
+            if isinstance(removed, int) and removed:
+                logger.info("FINEP: %s registros anteriores a %s removidos do banco", removed, MIN_PUBLICATION_YEAR)
+        except Exception:
+            logger.exception("Falha ao remover chamadas FINEP antigas do banco")
 
         return {
             "institution": self.institution,

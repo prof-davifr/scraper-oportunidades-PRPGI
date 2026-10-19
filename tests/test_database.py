@@ -121,3 +121,16 @@ class TestOpportunityDatabase:
         uid3 = tmp_db._generate_uid("Title A", "https://example.com/link2")
         assert uid1 != uid2
         assert uid1 != uid3
+
+    def test_delete_published_before_keeps_recent_and_undated(self, tmp_db):
+        tmp_db.add_opportunity_with_result("FINEP", "Antiga", "https://example.com/a", pub_date="2015-10-13")
+        tmp_db.add_opportunity_with_result("FINEP", "Recente", "https://example.com/b", pub_date="2025-01-02")
+        tmp_db.add_opportunity_with_result("FINEP", "Sem data", "https://example.com/c")
+        tmp_db.add_opportunity_with_result("CAPES", "Outra fonte", "https://example.com/d", pub_date="2020-01-01")
+
+        removed = tmp_db.delete_published_before("FINEP", "2025-01-01")
+
+        assert removed == 1
+        with sqlite3.connect(tmp_db.db_path) as conn:
+            titles = {t for (t,) in conn.execute("SELECT title FROM opportunities")}
+        assert titles == {"Recente", "Sem data", "Outra fonte"}

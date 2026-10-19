@@ -132,6 +132,25 @@ class OpportunityDatabase:
         )
         return result == "inserted"
 
+    def delete_published_before(self, institution: str, iso_date: str) -> int:
+        """Apaga registros da instituição publicados antes de `iso_date` (YYYY-MM-DD).
+
+        Registros sem data de publicação não são tocados. Retorna quantos saíram.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                DELETE FROM opportunities
+                WHERE institution = ?
+                  AND publication_date IS NOT NULL AND publication_date <> ''
+                  AND substr(publication_date, 1, 10) < ?
+                """,
+                (institution, iso_date),
+            )
+            conn.commit()
+            return cur.rowcount
+
     def _format_date(self, value) -> str:
         """Converte data ISO (YYYY-MM-DD) para DD/MM/YYYY para exibição.
         Aceita também timestamps ISO completos (YYYY-MM-DDTHH:MM:SS...)."""
