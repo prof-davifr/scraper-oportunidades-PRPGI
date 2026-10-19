@@ -68,9 +68,11 @@ pyinstaller scraper_exe.spec --noconfirm   # gera dist/GeradorEditais(.exe)
 ## Saídas
 
 - `oportunidades.db` — banco SQLite (dedup por SHA256 de título+link)
-- `editais.csv` — CSV com BOM (`utf-8-sig`). Colunas: Instituição, Título, Data de Lançamento, Prazo, Link, Documentos, Documentos Relacionados — ordenado por recência
+- `editais.csv` — CSV com BOM (`utf-8-sig`). Colunas: Instituição, Título, Data de Lançamento, Prazo, Situação, Link, Documentos, Documentos Relacionados — ordenado por recência
 - `editais.xlsx` — planilha Excel (mesmas colunas)
 - `editais.html` — página HTML standalone (ordena, filtra, destaca lançamentos recentes)
+
+A coluna **Situação** é calculada a cada exportação pelo prazo: `Aberta`, `Encerrada` (prazo antes do dia da exportação) ou `Sem prazo`. No HTML, os editais com prazo encerrado ficam marcados e escondidos por padrão; o seletor de situação volta a mostrá-los. Nada é apagado do banco.
 
 A exportação **consolida** documentos do mesmo edital (edital + retificações + resultados) em uma linha. Use `--no-consolidate` para a lista crua.
 

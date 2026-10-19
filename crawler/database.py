@@ -2,12 +2,38 @@ import base64
 import hashlib
 import re
 import sqlite3
+from datetime import date
 from pathlib import Path
 from typing import Literal
 
 import pandas as pd
 
 AddResult = Literal["inserted", "duplicate"]
+
+STATUS_OPEN = "Aberta"
+STATUS_CLOSED = "Encerrada"
+STATUS_NO_DEADLINE = "Sem prazo"
+
+
+def deadline_status(deadline, today: date | None = None) -> str:
+    """Situação do edital pelo prazo: "Aberta", "Encerrada" (prazo antes de hoje) ou "Sem prazo".
+
+    Calculada na exportação, para que um edital saia da lista no dia seguinte
+    ao fim do prazo sem depender de nova coleta. Aceita DD/MM/YYYY e ISO.
+    """
+    s = str(deadline or "").strip()
+    m = re.match(r"^(\d{2})/(\d{2})/(\d{4})", s)
+    try:
+        if m:
+            d = date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+        else:
+            m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", s)
+            if not m:
+                return STATUS_NO_DEADLINE
+            d = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        return STATUS_NO_DEADLINE
+    return STATUS_CLOSED if d < (today or date.today()) else STATUS_OPEN
 
 
 class OpportunityDatabase:
@@ -220,6 +246,7 @@ class OpportunityDatabase:
         csv_path: str = "editais.csv",
         xlsx_path: str = "editais.xlsx",
         consolidate: bool = True,
+        today: date | None = None,
     ) -> tuple[str, str]:
         """Export all opportunities to CSV and Excel.
 
@@ -227,6 +254,7 @@ class OpportunityDatabase:
             consolidate: quando True, agrupa documentos do mesmo edital
                 (atualizações, resultados, duplicatas) em uma única linha,
                 com a lista de documentos relacionados.
+            today: data de referência da coluna "Situação" (padrão: hoje).
 
         CSV is written as UTF-8 with BOM for Excel compatibility.
         Export ordering is deterministic (institution/title/link/id).
@@ -244,6 +272,7 @@ class OpportunityDatabase:
                         "Título": g["title"],
                         "Data de Lançamento": self._format_date(g["publication_date"]),
                         "Prazo": self._format_date(g["deadline"]),
+                        "Situação": deadline_status(g["deadline"], today),
                         "Link": g["link"],
                         "Documentos": g["docs_count"],
                         "Documentos Relacionados": related_text,
@@ -272,19 +301,35 @@ class OpportunityDatabase:
                 # Data de lançamento em ISO (YYYY-MM-DD) -> DD/MM/YYYY para exibição
                 if "Data de Lançamento" in df.columns:
                     df["Data de Lançamento"] = df["Data de Lançamento"].apply(lambda v: self._format_date(v))
+                df.insert(df.columns.get_loc("Prazo") + 1, "Situação", df["Prazo"].apply(deadline_status, today=today))
 
         df.to_csv(csv_path, index=False, encoding="utf-8-sig")
         df.to_excel(xlsx_path, index=False)
         return csv_path, xlsx_path
 
-    def export_to_html(self, html_path: str = "editais.html", consolidate: bool = True) -> str:
+    @staticmethod
+    def _row_attrs(recent: str, deadline, today: date | None) -> tuple[str, int]:
+        """Atributos do <tr>: classes (recent/expired) e data-status; e 1 se o prazo já passou."""
+        closed = deadline_status(deadline, today) == STATUS_CLOSED
+        classes = [c for c in ("recent" if recent else "", "expired" if closed else "") if c]
+        cls = f' class="{" ".join(classes)}"' if classes else ""
+        return f'{cls} data-status="{"encerrado" if closed else "aberto"}"', int(closed)
+
+    def export_to_html(
+        self, html_path: str = "editais.html", consolidate: bool = True, today: date | None = None
+    ) -> str:
         """Export all opportunities to a standalone HTML page.
 
         Args:
             consolidate: quando True, agrupa documentos do mesmo edital em uma
                 única linha, com os documentos relacionados em um seletor
                 expansível (coluna "Documentos").
+            today: data de referência para marcar prazos encerrados (padrão: hoje).
+
+        Editais com prazo encerrado continuam no HTML, marcados como
+        encerrados e escondidos por padrão; o seletor "Situação" os mostra.
         """
+        closed_count = 0
         # Símbolo IFBA embutido como data URI (mantém o HTML standalone)
         logo_svg = Path(__file__).resolve().parent / "assets" / "ifba-logo-branco.svg"
         logo_b64 = base64.b64encode(logo_svg.read_bytes()).decode("ascii")
@@ -331,7 +376,9 @@ class OpportunityDatabase:
                     )
                 else:
                     docs_cell = "—"
-                rows_html += f"""<tr{recent}>
+                row_attrs, closed = self._row_attrs(recent, deadline, today)
+                closed_count += closed
+                rows_html += f"""<tr{row_attrs}>
                 <td class="inst">{inst}</td>
                 <td class="title"><a href="{link}" target="_blank" rel="noopener">{safe_title}</a></td>
                 <td class="pub">{safe_pub}</td>
@@ -373,7 +420,9 @@ class OpportunityDatabase:
                             recent = ' class="recent"'
                     except ValueError:
                         pass
-                rows_html += f"""<tr{recent}>
+                row_attrs, closed = self._row_attrs(recent, deadline, today)
+                closed_count += closed
+                rows_html += f"""<tr{row_attrs}>
                 <td class="inst">{inst}</td>
                 <td class="title"><a href="{link}" target="_blank" rel="noopener">{safe_title}</a></td>
                 <td class="pub">{safe_pub}</td>
@@ -444,6 +493,9 @@ class OpportunityDatabase:
   .docs .docdate {{ color: #888; font-size: .75rem; white-space: nowrap; }}
   tr.recent {{ background: #eef7ef; }}
   tr.recent td.pub::after {{ content: " • novo"; color: #00853f; font-weight: 600; font-size: .72rem; }}
+  tr.expired {{ background: #f7f7f7; }}
+  tr.expired td, tr.expired .title a {{ color: #8a8a8a; }}
+  tr.expired td.deadline::after {{ content: " • encerrado"; color: #b3261e; font-weight: 600; font-size: .72rem; }}
   .empty {{ text-align: center; padding: 3rem 1rem; color: #888; }}
   .btn-sobre {{ margin-top: .5rem; background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.5); border-radius: 20px; padding: .3rem .9rem; font-size: .78rem; cursor: pointer; font-weight: 600; transition: background .15s; }}
   .btn-sobre:hover {{ background: rgba(255,255,255,.3); }}
@@ -498,6 +550,11 @@ class OpportunityDatabase:
       <option value="60">Últimos 60 dias</option>
       <option value="90">Últimos 90 dias</option>
     </select>
+    <select id="filterStatus" onchange="filterTable()">
+      <option value="abertos" selected>Esconder prazos encerrados</option>
+      <option value="">Incluir prazos encerrados ({closed_count})</option>
+      <option value="encerrados">Só prazos encerrados ({closed_count})</option>
+    </select>
   </div>
   <div class="table-wrap">
     <table id="oppTable">
@@ -527,6 +584,7 @@ function filterTable() {{
   const q = document.getElementById('filterTitle').value.toLowerCase();
   const inst = document.getElementById('filterInst').value;
   const days = parseInt(document.getElementById('filterRecent').value || '0', 10);
+  const status = document.getElementById('filterStatus').value;
   const now = Date.now();
   const dayMs = 24*60*60*1000;
   document.querySelectorAll('#oppTable tbody tr').forEach(r => {{
@@ -539,7 +597,9 @@ function filterTable() {{
     const matchTitle = !q || title.includes(q);
     const matchInst = !inst || rowInst === inst;
     const matchRecent = !days || (pubMs && (now - pubMs) <= days*dayMs);
-    r.style.display = matchTitle && matchInst && matchRecent ? '' : 'none';
+    const closed = r.dataset.status === 'encerrado';
+    const matchStatus = !status || (status === 'encerrados' ? closed : !closed);
+    r.style.display = matchTitle && matchInst && matchRecent && matchStatus ? '' : 'none';
   }});
 }}
 let sortDir = [1,1,1,1,1];
@@ -578,6 +638,7 @@ function closeSobre() {{
 document.addEventListener('keydown', e => {{
   if (e.key === 'Escape') closeSobre();
 }});
+filterTable();
 </script>
 </body>
 </html>"""
