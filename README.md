@@ -79,10 +79,12 @@ A exportação **consolida** documentos do mesmo edital (edital + retificações
 ## Data de lançamento
 
 - **CNPq**: "Publicado em" da página de chamadas abertas.
-- **FINEP**: `dataDePublicacao` da API REST.
+- **FINEP**: `dataDePublicacao` da API REST; chamadas publicadas antes de 2025 ficam de fora (a API ainda lista algumas de 2015–2024 como abertas).
 - **FAPESB**: `date` da API do WordPress + prazo best-effort da página/PDF.
-- **CAPES**: data no nome do arquivo PDF (padrão SEI `DDMMYYYY_...`).
+- **CAPES**: data no nome do arquivo PDF (padrão SEI `DDMMYYYY_...`); sem ela, metadados de criação do PDF — aproximação.
 - **SETEC**: metadados de criação do PDF (`pypdf`) — aproximação.
+
+Os PDFs do gov.br saem pelo endereço `<link>/@@download/file` (o endereço cru devolve a página HTML). Cada rodada consulta até 120 PDFs por fonte entre os registros ainda sem data.
 
 Registros existentes têm datas vazias preenchidas automaticamente nas execuções seguintes.
 

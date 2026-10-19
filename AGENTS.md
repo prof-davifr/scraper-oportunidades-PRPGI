@@ -24,13 +24,13 @@ No lockfile exists; dependencies are tracked in `requirements.txt`.
 ## Key details
 
 - **DB**: SQLite at `oportunidades.db` (root). Deduplicates via SHA256 hash of title+link. `add_opportunity_with_result` preenche datas vazias de registros duplicados (UPDATE via COALESCE).
-- **Output**: `editais.csv`, `editais.xlsx`, and `editais.html` written to project root (or `--output-dir`). CSV uses `utf-8-sig` (BOM). **Exportação consolida** documentos do mesmo edital em uma linha (colunas `Documentos`/`Documentos Relacionados`); `--no-consolidate` para lista crua.
+- **Output**: `editais.csv`, `editais.xlsx`, and `editais.html` written to project root (or `--output-dir`). CSV uses `utf-8-sig` (BOM). **Exportação consolida** documentos do mesmo edital em uma linha (colunas `Documentos`/`Documentos Relacionados`); `--no-consolidate` para lista crua. Coluna `Situação` (Aberta/Encerrada/Sem prazo) calculada pelo prazo na exportação (`deadline_status`); no HTML os encerrados ficam escondidos por padrão.
 - **Parser mechanics — TODOS via httpx + BeautifulSoup, SEM navegador/Playwright**:
-  - CAPES: program pages + direct PDF links (extracts date from SEI filename `DDMMYYYY_...`).
+  - CAPES: program pages + direct PDF links (extracts date from SEI filename `DDMMYYYY_...`; records still without date get the PDF creation date via `crawler/pdf_utils.backfill_pdf_dates`, up to 120 per run — gov.br serves the PDF only at `<link>/@@download/file`).
   - CNPq: gov.br chamadas abertas (`#content div.item`) — title, "Publicado em" (date), "Inscrições" (deadline).
-  - FINEP: REST API `/o/c/chamadapublicas`, filters `situacao.key == "aberta"`; `dataDePublicacao` → date.
+  - FINEP: REST API `/o/c/chamadapublicas`, filters `situacao.key == "aberta"`; `dataDePublicacao` → date. Calls published before 2025 (`MIN_PUBLICATION_YEAR`) are skipped and purged from the DB each run.
   - FAPESB: WordPress REST API (`wp-json/wp/v2/posts`, category "Edital"); deadlines best-effort from page prose/PDF cronograma (pypdf). The "⏰ Início/Encerramento" widget is a fixed template — do NOT use it.
-  - SETEC: gov.br/MEC editais pages by year; extracts edital blocks (`<p>` title + `<ul>` annexes), one record per edital with real title; `_clean_title` removes nav/anexo noise. CAPTCHA retry via `crawler/http_utils.py`.
+  - SETEC: gov.br/MEC editais pages by year; extracts edital blocks (`<p>` title + `<ul>` annexes), one record per edital with real title; `_clean_title` removes nav/anexo noise. CAPTCHA retry via `crawler/http_utils.py`. No date on the page: PDF creation date via `backfill_pdf_dates` (same as CAPES).
 - **HTTP**: `crawler/http_utils.py` — `fetch_text` with retry/backoff and CAPTCHA detection ("human visitor", "Acesso Temporariamente Interrompido"). Use it in new parsers.
 - **Consolidation**: `crawler/consolidate.py` groups documents of the same edital (number/type/year) in exports.
 - **Standalone parser execution**: Parser `__main__` blocks resolve project root robustly and write outputs to root-level files.
@@ -55,7 +55,7 @@ No lockfile exists; dependencies are tracked in `requirements.txt`.
 - **Government sites are unreliable / CAPTCHA intermitente**: `gov.br` and `finep.gov.br` are slow, may return 5xx, and occasionally serve a CAPTCHA page ("human visitor"). `fetch_text` retries; parsers return 0 results gracefully when all attempts are blocked.
 - **SETEC (`gov.br/mec`)**: after several accesses it may block for minutes — rerun later.
 - **MCTI (removido)**: a página de editais passou a exigir login gov.br (302 → `require_login`) e o link de referência virou 404 — parser removido do sistema em 04/08/2026. Reavaliar se o MCTI voltar a publicar listagem pública.
-- **No tests, no CI, no linting**: legacy statement — actually there IS pytest (46 tests) and CI (lint+test+build-windows). Ruff check has pre-existing failures; CI runs `ruff check .` (may fail — decide whether to clean or adjust).
+- **Tests/lint**: pytest (68 tests) and CI (lint+test+build-windows); `ruff check .` and `ruff format --check .` are clean. CI also runs weekly (cron) and by `workflow_dispatch`, because the bot's push does not trigger workflows.
 - **Deploy automático**: o `crawl.yml` roda em IP de datacenter (Azure) — `gov.br` pode bloquear; o job aceita resultado parcial e o site mantém a última versão boa. Rodada manual via `workflow_dispatch`.
 - **Dependency manifest**: runtime deps in `requirements.txt` (httpx, beautifulsoup4, pandas, openpyxl, pypdf) and `pyproject.toml`.
 

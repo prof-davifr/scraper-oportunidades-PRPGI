@@ -4,7 +4,7 @@ Coletor de editais de fomento à pesquisa (CAPES, CNPq, FINEP, FAPESB, SETEC) �
 banco SQLite persistido no repositório, exports CSV/XLSX/HTML e publicação
 diária no GitHub Pages.
 
-_Última atualização: 31/08/2026 (sessão: revisão do backlog depois de 26 dias de crawl automático)_
+_Última atualização: 18/10/2026 (sessão: datas por PDF, corte FINEP, prazos encerrados, Actions em Node 24)_
 
 ---
 
@@ -32,26 +32,72 @@ _Última atualização: 31/08/2026 (sessão: revisão do backlog depois de 26 di
 
 ## Backlog
 
-- [ ] **CAPES — 279/346 registros sem data de lançamento** (só há data quando o nome do arquivo SEI traz `DDMMYYYY_`).
+> **18/10/2026** — os commits de código desta revisão (`38c281b`, `c4a01ae`,
+> `c07a824`, `66c3b07`) estão só na cópia local; `origin/main` está 28 commits
+> à frente, todos de crawl do robô (só banco e exports). Falta o push — e,
+> antes dele, trazer os commits do robô (os de código não tocam em banco nem
+> em exports, então não há conflito). O banco e os exports **não** foram
+> regenerados localmente: o próximo crawl do robô aplica as mudanças.
+
+- [x] **CAPES — 279/346 registros sem data de lançamento** (só há data quando o nome do arquivo SEI traz `DDMMYYYY_`).
       É a maior lacuna da página, que ordena e filtra por recência. Explorar a
       leitura do texto do PDF — o gov.br serve HTML para o `httpx`, então precisa
       de outra estratégia de download. (Era 398/654 em 04/08; o denominador caiu
       com a limpeza de resultados de seleção.)
+      **Feito em 18/10/2026** (`c4a01ae`): o gov.br entrega o arquivo em
+      `<link>/@@download/file`. No fim de cada rodada, `backfill_pdf_dates`
+      (`crawler/pdf_utils.py`) sorteia até 120 registros sem data, baixa o PDF
+      e grava a data de criação dos metadados (aproximação; só se o campo
+      estiver vazio e a data cair entre 2000 e hoje). Em `origin/main` eram
+      301/368 sem data; numa cópia do banco, 20 de 20 PDFs devolveram data —
+      a lacuna deve fechar em três rodadas.
 - [ ] **Editais vencidos nunca saem da página** — os 475 registros estão com `status = 'Aberta'` e só 43 têm prazo.
       Definir a regra de encerramento (prazo vencido → mudança de `status` ou
       filtro no export) antes de divulgar mais o link para a comunidade.
-- [ ] **SETEC — 0/56 registros com data**, embora a extração por metadados de PDF tenha chegado a 29/53 em 03/08.
+      **18/10/2026 — implementada uma regra provisória, reversível** (`c07a824`):
+      a situação sai do prazo na hora da exportação (`deadline_status`:
+      Aberta / Encerrada / Sem prazo), sem mudar o banco. CSV e XLSX ganham a
+      coluna Situação; no HTML a linha encerrada fica cinza, marcada
+      "encerrado", e escondida por padrão (seletor "Incluir/Só prazos
+      encerrados"). Em `origin/main`: 228 editais consolidados, **38 encerrados**,
+      10 abertos, 180 sem prazo. **Falta decidir:** (1) se a vista padrão deve
+      mesmo esconder os encerrados; (2) o que fazer com os 180 sem prazo (quase
+      todos CAPES e SETEC) — eles nunca encerram. Recomendação: manter a regra e,
+      para os sem prazo, esconder por padrão os que tiverem lançamento com mais
+      de 12 meses.
+- [x] **SETEC — 0/56 registros com data**, embora a extração por metadados de PDF tenha chegado a 29/53 em 03/08.
       Verificar se `crawler/pdf_utils.py` ainda roda no crawl diário ou se os
       links dos PDFs morreram (404 no gov.br).
-- [ ] **FINEP lista 9 chamadas de 2015–2024** como "aberta" na API (a mais antiga é de 13/10/2015).
+      **Feito em 18/10/2026** (`c4a01ae`): não rodava — o `setec.py` versionado
+      nunca chamou o `pdf_utils` (a extração de 03/08 não entrou no parser). Agora
+      usa o mesmo `backfill_pdf_dates` da CAPES; numa cópia do banco, 14 de 15
+      PDFs devolveram data (o outro deu 404).
+      **Achado:** as datas mostram editais SETEC de 2016 a 2022 (a página de
+      "anterior a 2021" é coletada), que o corte manual de 03/08 tinha tirado.
+      Decidir se o corte de 2025 vale também para a SETEC (recomendação: sim,
+      parando de seguir os links de ano < 2025 em `_get_year_links`).
+- [x] **FINEP lista 9 chamadas de 2015–2024** como "aberta" na API (a mais antiga é de 13/10/2015).
       O corte "só de 2025 em diante" foi limpeza manual em 03/08, nunca virou
       regra do pipeline — implementar o filtro na ingestão.
-- [ ] **CI parado desde 05/08/2026** — o `ci.yml` só dispara em push, e o push do bot não re-dispara workflows.
+      **Feito em 18/10/2026** (`38c281b`): `MIN_PUBLICATION_YEAR = 2025` em
+      `crawler/parsers/finep.py`; a ingestão pula o que for anterior e cada
+      rodada apaga do banco os registros FINEP com data anterior a 2025 (os sem
+      data ficam). Numa cópia do banco de `origin/main`: 9 removidos, 41 → 32.
+- [x] **CI parado desde 05/08/2026** — o `ci.yml` só dispara em push, e o push do bot não re-dispara workflows.
       Lint, testes e build do exe Windows não rodam há 26 dias. Avaliar um
       `schedule` no `ci.yml` ou chamar `ruff`/`pytest` dentro do `crawl.yml`.
-- [ ] **Actions em Node 20 depreciado** — `checkout@v4`, `setup-python@v5`, `upload-artifact@v4` e `deploy-pages@v4`.
+      **Feito em 20/09/2026** (`8f7cfaf`): cron semanal (`0 12 * * 1`) e
+      `workflow_dispatch` no `ci.yml`; já está em `origin/main`.
+- [x] **Actions em Node 20 depreciado** — `checkout@v4`, `setup-python@v5`, `upload-artifact@v4` e `deploy-pages@v4`.
       Já rodam forçados em Node 24, com aviso em toda execução. Atualizar as versões.
+      **Feito em 18/10/2026**: `checkout@v5` já tinha entrado em `8f7cfaf`; em
+      `66c3b07` sobem `setup-python@v6`, `upload-artifact@v6`,
+      `upload-pages-artifact@v5` e `deploy-pages@v5` (todas `node24`, conferido
+      no `action.yml` de cada uma). Só dá para ver rodando depois do push.
 - [ ] **MCTI** — reavaliar a re-inclusão se voltar a publicar listagem pública de editais (hoje: 302 → `require_login`).
+      Conferido em 18/10/2026: `gov.br/mcti/pt-br/acesso-a-informacao/editais`
+      ainda responde 302 → `require_login`, e `acompanhe-o-mcti/editais-concursos-e-chamadas-publicas`
+      segue 404. Nada a fazer por ora.
 
 ## Concluído (ago/2026)
 
@@ -239,6 +285,7 @@ _Última atualização: 31/08/2026 (sessão: revisão do backlog depois de 26 di
 | 05/08/2026 | deploy | Repo público + Pages no ar; Sobre em pop-up e identidade IFBA/NPP no HTML |
 | 06/08 a 31/08/2026 | todas (Actions) | Crawl diário automático: 33 execuções, 32 verdes (1 timeout de deploy em 06/08); banco 434 → **475** |
 | 31/08/2026 | todas | processed=375, new=0, duplicates=375, erros=0; db_total=**475** (CAPES 346, SETEC 56, FINEP 38, FAPESB 20, CNPq 15) |
+| 18/10/2026 | banco (`origin/main`) | **507** registros (CAPES 368, SETEC 56, FINEP 41, FAPESB 24, CNPq 18); com data 150, com prazo 50 (40 já vencidos) |
 
 ## Fonte de referência
 
