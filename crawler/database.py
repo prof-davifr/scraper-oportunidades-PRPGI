@@ -525,8 +525,8 @@ class OpportunityDatabase:
   tr.expired td, tr.expired .title a {{ color: #8a8a8a; }}
   tr.expired td.deadline::after {{ content: " • encerrado"; color: #b3261e; font-weight: 600; font-size: .72rem; }}
   .empty {{ text-align: center; padding: 3rem 1rem; color: #888; }}
-  .btn-sobre {{ margin-top: .5rem; background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.5); border-radius: 20px; padding: .3rem .9rem; font-size: .78rem; cursor: pointer; font-weight: 600; transition: background .15s; }}
-  .btn-sobre:hover {{ background: rgba(255,255,255,.3); }}
+  .btn-sobre {{ background: #fff; color: #165c33; border: 2px solid #165c33; border-radius: 20px; padding: .35em .75em; font-size: .8rem; cursor: pointer; font-weight: 600; transition: background .15s; }}
+  .btn-sobre:hover {{ background: #eef7ef; }}
   .modal-overlay {{ display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 50; align-items: center; justify-content: center; padding: 1rem; }}
   .modal {{ background: #fff; border-radius: 12px; max-width: 560px; width: 100%; padding: 1.75rem 2rem; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,.3); max-height: 90vh; overflow-y: auto; }}
   .modal h2 {{ color: #165c33; margin-bottom: .75rem; font-size: 1.2rem; }}
@@ -547,7 +547,6 @@ class OpportunityDatabase:
     <div>
       <h1>Editais de Pesquisa e Inovação</h1>
       <p>Assessoria de Ciência de Dados - NPP - PRPGI / IFBA</p>
-      <button class="btn-sobre" onclick="openSobre()">ℹ️ Sobre</button>
     </div>
     <img class="logo" src="data:image/svg+xml;base64,{logo_b64}" alt="Instituto Federal da Bahia">
   </header>
@@ -562,6 +561,7 @@ class OpportunityDatabase:
     </div>
   </div>
   <div class="stats">
+    <button class="btn-sobre" onclick="openSobre()">Sobre</button>
     <span class="badge badge-total" data-inst="" onclick="filterByInst('')">Total: {total_count}</span>
     {inst_badges}
   </div>
