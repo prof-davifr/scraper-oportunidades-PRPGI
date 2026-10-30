@@ -14,6 +14,14 @@ STATUS_OPEN = "Aberta"
 STATUS_CLOSED = "Encerrada"
 STATUS_NO_DEADLINE = "Sem prazo"
 
+# Ícone "abrir página" (seta para fora de uma caixa), herda a cor do link
+PAGE_ICON_SVG = (
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" '
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>'
+    '<path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>'
+)
+
 
 def deadline_status(deadline, today: date | None = None) -> str:
     """Situação do edital pelo prazo: "Aberta", "Encerrada" (prazo antes de hoje) ou "Sem prazo".
@@ -64,10 +72,15 @@ class OpportunityDatabase:
                     publication_date TEXT,
                     deadline TEXT,
                     status TEXT,
-                    captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    page_url TEXT
                 )
                 """
             )
+            # Bancos anteriores à coluna page_url (página onde o documento aparece)
+            cols = {row[1] for row in cursor.execute("PRAGMA table_info(opportunities)")}
+            if "page_url" not in cols:
+                cursor.execute("ALTER TABLE opportunities ADD COLUMN page_url TEXT")
             conn.commit()
 
     def _generate_uid(self, title: str, link: str) -> str:
@@ -83,8 +96,12 @@ class OpportunityDatabase:
         pub_date: str = "",
         deadline: str = "",
         status: str = "Aberta",
+        page_url: str = "",
     ) -> AddResult:
         """Insert an opportunity and return insertion status.
+
+        `page_url` é a página do edital quando `link` aponta para o documento
+        (PDF); fica vazio quando o próprio `link` já é a página.
 
         Returns:
             "inserted" when a new record is added.
@@ -96,8 +113,8 @@ class OpportunityDatabase:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO opportunities (uid, institution, title, link, description, publication_date, deadline, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO opportunities (uid, institution, title, link, description, publication_date, deadline, status, page_url)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         uid,
@@ -108,12 +125,13 @@ class OpportunityDatabase:
                         pub_date,
                         deadline,
                         status,
+                        page_url,
                     ),
                 )
                 conn.commit()
             return "inserted"
         except sqlite3.IntegrityError:
-            # Registro já existe (dedup por uid): preenche datas vazias,
+            # Registro já existe (dedup por uid): preenche datas e página vazias,
             # mantendo as informações já capturadas.
             try:
                 with sqlite3.connect(self.db_path) as conn:
@@ -122,10 +140,11 @@ class OpportunityDatabase:
                         """
                         UPDATE opportunities
                         SET publication_date = COALESCE(NULLIF(publication_date, ''), ?),
-                            deadline = COALESCE(NULLIF(deadline, ''), ?)
+                            deadline = COALESCE(NULLIF(deadline, ''), ?),
+                            page_url = COALESCE(NULLIF(page_url, ''), NULLIF(?, ''))
                         WHERE uid = ?
                         """,
-                        (pub_date, deadline, uid),
+                        (pub_date, deadline, page_url, uid),
                     )
                     conn.commit()
             except sqlite3.Error:
@@ -234,7 +253,7 @@ class OpportunityDatabase:
             cur.execute(
                 """
                 SELECT id, institution, title, description, link,
-                       publication_date, deadline
+                       publication_date, deadline, page_url
                 FROM opportunities
                 """
             )
@@ -315,6 +334,19 @@ class OpportunityDatabase:
         cls = f' class="{" ".join(classes)}"' if classes else ""
         return f'{cls} data-status="{"encerrado" if closed else "aberto"}"', int(closed)
 
+    @staticmethod
+    def _title_cell(safe_title: str, link: str, page_url) -> str:
+        """Título com link para o documento e, quando o documento não é a própria
+        página, um ícone com link para a página do edital."""
+        cell = f'<a href="{link}" target="_blank" rel="noopener">{safe_title}</a>'
+        if page_url and page_url != link:
+            cell += (
+                f' <a class="page-link" href="{page_url}" target="_blank" rel="noopener"'
+                ' title="Página do edital" aria-label="Página do edital">'
+                f"{PAGE_ICON_SVG}</a>"
+            )
+        return cell
+
     def export_to_html(
         self, html_path: str = "editais.html", consolidate: bool = True, today: date | None = None
     ) -> str:
@@ -348,11 +380,9 @@ class OpportunityDatabase:
                 inst = g["institution"]
                 title = g["title"]
                 link = g["link"]
-                desc = g["description"]
                 pub_date = g["latest_date"] or g["publication_date"]
                 deadline = g["deadline"]
                 safe_title = title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                safe_desc = (desc or "")[:300].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 safe_deadline = self._format_date(deadline) or "—"
                 safe_pub = self._format_date(pub_date) or "—"
                 recent = ""
@@ -371,7 +401,7 @@ class OpportunityDatabase:
                         for r in g["related"]
                     )
                     docs_cell = (
-                        f'<details class="docs"><summary>{len(g["related"])} relacionado(s)</summary>'
+                        f'<details class="docs"><summary title="Documentos relacionados">{len(g["related"])}</summary>'
                         f"<ul>{docs_items}</ul></details>"
                     )
                 else:
@@ -380,10 +410,9 @@ class OpportunityDatabase:
                 closed_count += closed
                 rows_html += f"""<tr{row_attrs}>
                 <td class="inst">{inst}</td>
-                <td class="title"><a href="{link}" target="_blank" rel="noopener">{safe_title}</a></td>
+                <td class="title">{self._title_cell(safe_title, link, g["page_url"])}</td>
                 <td class="pub">{safe_pub}</td>
                 <td class="deadline">{safe_deadline}</td>
-                <td class="desc">{safe_desc}</td>
                 <td class="docs">{docs_cell}</td>
             </tr>
 """
@@ -391,7 +420,7 @@ class OpportunityDatabase:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT institution, title, publication_date, deadline, link, description
+                    SELECT institution, title, publication_date, deadline, link, page_url
                     FROM opportunities
                     ORDER BY
                         CASE WHEN publication_date IS NULL OR publication_date = '' THEN 1 ELSE 0 END,
@@ -404,9 +433,8 @@ class OpportunityDatabase:
             total_count = sum(totals.values())
 
             rows_html = ""
-            for inst, title, pub_date, deadline, link, desc in rows:
+            for inst, title, pub_date, deadline, link, page_url in rows:
                 safe_title = title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                safe_desc = (desc or "")[:300].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 safe_deadline = self._format_date(deadline) or "—"
                 safe_pub = self._format_date(pub_date) or "—"
                 # destaque para lançamentos recentes (últimos 60 dias)
@@ -424,10 +452,9 @@ class OpportunityDatabase:
                 closed_count += closed
                 rows_html += f"""<tr{row_attrs}>
                 <td class="inst">{inst}</td>
-                <td class="title"><a href="{link}" target="_blank" rel="noopener">{safe_title}</a></td>
+                <td class="title">{self._title_cell(safe_title, link, page_url)}</td>
                 <td class="pub">{safe_pub}</td>
                 <td class="deadline">{safe_deadline}</td>
-                <td class="desc">{safe_desc}</td>
                 <td class="docs">—</td>
             </tr>
 """
@@ -477,9 +504,10 @@ class OpportunityDatabase:
   .inst {{ font-weight: 600; white-space: nowrap; color: #165c33; }}
   .title a {{ color: #1a73e8; text-decoration: none; }}
   .title a:hover {{ text-decoration: underline; }}
+  .title a.page-link {{ display: inline-block; margin-left: .2rem; vertical-align: -2px; color: #165c33; opacity: .7; }}
+  .title a.page-link:hover {{ opacity: 1; }}
   .pub {{ white-space: nowrap; color: #333; font-variant-numeric: tabular-nums; }}
   .deadline {{ white-space: nowrap; color: #666; }}
-  .desc {{ color: #555; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
   .docs {{ white-space: nowrap; color: #666; }}
   .docs details {{ position: relative; }}
   .docs summary {{ cursor: pointer; color: #165c33; font-weight: 600; user-select: none; }}
@@ -509,7 +537,6 @@ class OpportunityDatabase:
   @media (max-width: 640px) {{
     header {{ padding: 1rem; }}
     header .logo {{ height: 48px; }}
-    .desc {{ max-width: 140px; }}
     td, th {{ padding: .4rem .3rem; font-size: .8rem; }}
   }}
 </style>
@@ -564,7 +591,6 @@ class OpportunityDatabase:
           <th onclick="sortTable(1)">Título</th>
           <th onclick="sortTable(2)">Lançamento</th>
           <th onclick="sortTable(3)">Prazo</th>
-          <th onclick="sortTable(4)">Descrição</th>
           <th>Documentos</th>
         </tr>
       </thead>
@@ -602,7 +628,7 @@ function filterTable() {{
     r.style.display = matchTitle && matchInst && matchRecent && matchStatus ? '' : 'none';
   }});
 }}
-let sortDir = [1,1,1,1,1];
+let sortDir = [1,1,1,1];
 function sortTable(col) {{
   const tbody = document.querySelector('#oppTable tbody');
   const rows = Array.from(tbody.querySelectorAll('tr'));

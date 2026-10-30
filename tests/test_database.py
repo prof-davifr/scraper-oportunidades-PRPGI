@@ -134,3 +134,55 @@ class TestOpportunityDatabase:
         with sqlite3.connect(tmp_db.db_path) as conn:
             titles = {t for (t,) in conn.execute("SELECT title FROM opportunities")}
         assert titles == {"Recente", "Sem data", "Outra fonte"}
+
+    def test_page_url_fills_on_duplicate(self, tmp_db):
+        pdf = "https://example.com/edital.pdf"
+        tmp_db.add_opportunity_with_result("CAPES", "Edital nº 1/2026", pdf)
+        tmp_db.add_opportunity_with_result("CAPES", "Edital nº 1/2026", pdf, page_url="https://example.com/programa")
+        tmp_db.add_opportunity_with_result("CAPES", "Edital nº 1/2026", pdf, page_url="https://example.com/outra")
+
+        rows = tmp_db._fetch_all_rows()
+        assert [r["page_url"] for r in rows] == ["https://example.com/programa"]
+
+    def test_init_adds_page_url_to_old_db(self, tmp_path):
+        db_path = tmp_path / "old.db"
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                "CREATE TABLE opportunities (id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT UNIQUE, "
+                "institution TEXT, title TEXT, description TEXT, link TEXT, publication_date TEXT, "
+                "deadline TEXT, status TEXT, captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+            )
+
+        db = OpportunityDatabase(str(db_path))
+        db.add_opportunity_with_result(
+            "SETEC", "Edital 1", "https://example.com/1.pdf", page_url="https://example.com/2026"
+        )
+
+        assert db._fetch_all_rows()[0]["page_url"] == "https://example.com/2026"
+
+    def test_export_html_columns_and_page_icon(self, tmp_db, tmp_path):
+        tmp_db.add_opportunity_with_result(
+            "CAPES",
+            "Edital nº 5/2026 - Programa X",
+            "https://example.com/edital5.pdf",
+            description="Descrição longa do edital",
+            pub_date="2026-01-10",
+            page_url="https://example.com/programa-x",
+        )
+        tmp_db.add_opportunity_with_result(
+            "CAPES",
+            "Resultado final do Edital nº 5/2026 - Programa X",
+            "https://example.com/resultado5.pdf",
+            pub_date="2026-03-10",
+        )
+        tmp_db.add_opportunity_with_result("CNPq", "Chamada nº 9/2026", "https://example.com/chamada-9")
+
+        html = Path(tmp_db.export_to_html(str(tmp_path / "editais.html"))).read_text(encoding="utf-8")
+
+        assert ">Descrição<" not in html
+        assert "Descrição longa do edital" not in html
+        assert "relacionado(s)" not in html
+        assert '<summary title="Documentos relacionados">1</summary>' in html
+        assert html.count('class="page-link" href="https://example.com/programa-x"') == 1
+        # o link do CNPq já é a página: sem ícone
+        assert html.count('class="page-link"') == 1

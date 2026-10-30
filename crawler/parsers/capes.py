@@ -143,6 +143,7 @@ class CapesParser:
                         description=desc_text[:500].strip(),
                         pub_date=pub_date,
                         deadline=deadline,
+                        page_url=_MAIN_URL,
                     )
                     if result == "inserted":
                         inserted_count += 1
@@ -178,6 +179,7 @@ class CapesParser:
                                 description=desc_text[:500].strip(),
                                 pub_date=pub_date,
                                 deadline=deadline,
+                                page_url=prog_url,
                             )
                             if result == "inserted":
                                 inserted_count += 1

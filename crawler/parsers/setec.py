@@ -237,6 +237,7 @@ class SetecParser:
                             link=edital["link"],
                             description=edital["title"],
                             deadline="",
+                            page_url=year_url,
                         )
                         if result == "inserted":
                             inserted_count += 1

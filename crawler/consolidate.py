@@ -266,13 +266,14 @@ def consolidate_editais(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
     Args:
         rows: lista de dicts com as chaves institution, title, link,
-            publication_date, deadline, description e opcionalmente id.
+            publication_date, deadline, description e opcionalmente id e
+            page_url (página do edital quando link é o PDF).
 
     Returns:
         Lista de grupos consolidados:
             {
                 "institution", "title", "link", "publication_date", "deadline",
-                "description", "docs_count", "latest_date",
+                "description", "page_url", "docs_count", "latest_date",
                 "related": [{"title", "link", "publication_date"}, ...]
             }
     """
@@ -348,6 +349,8 @@ def consolidate_editais(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "publication_date": primary.get("publication_date") or "",
                 "deadline": primary.get("deadline") or "",
                 "description": primary.get("description") or "",
+                # página do edital: a do principal ou, sem ela, a de um relacionado
+                "page_url": primary.get("page_url") or next((u["page_url"] for u in grp if u.get("page_url")), ""),
                 "docs_count": len(grp),
                 "latest_date": sort_date,
                 "related": [

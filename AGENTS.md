@@ -23,7 +23,8 @@ No lockfile exists; dependencies are tracked in `requirements.txt`.
 
 ## Key details
 
-- **DB**: SQLite at `oportunidades.db` (root). Deduplicates via SHA256 hash of title+link. `add_opportunity_with_result` preenche datas vazias de registros duplicados (UPDATE via COALESCE).
+- **DB**: SQLite at `oportunidades.db` (root). Deduplicates via SHA256 hash of title+link. `add_opportunity_with_result` preenche datas vazias de registros duplicados (UPDATE via COALESCE) e também `page_url`.
+- **`page_url`**: página do edital quando `link` é o PDF (CAPES: página do programa; SETEC: página do ano). Vazio quando o `link` já é a página (CNPq, FINEP, FAPESB). No HTML, o título abre o `link` e um ícone ao lado abre o `page_url`; o HTML não tem coluna de descrição, e a coluna "Documentos" mostra só o número de documentos relacionados.
 - **Output**: `editais.csv`, `editais.xlsx`, and `editais.html` written to project root (or `--output-dir`). CSV uses `utf-8-sig` (BOM). **Exportação consolida** documentos do mesmo edital em uma linha (colunas `Documentos`/`Documentos Relacionados`); `--no-consolidate` para lista crua. Coluna `Situação` (Aberta/Encerrada/Sem prazo) calculada pelo prazo na exportação (`deadline_status`); no HTML os encerrados ficam escondidos por padrão.
 - **Parser mechanics — TODOS via httpx + BeautifulSoup, SEM navegador/Playwright**:
   - CAPES: program pages + direct PDF links (extracts date from SEI filename `DDMMYYYY_...`; records still without date get the PDF creation date via `crawler/pdf_utils.backfill_pdf_dates`, up to 120 per run — gov.br serves the PDF only at `<link>/@@download/file`).
@@ -55,7 +56,7 @@ No lockfile exists; dependencies are tracked in `requirements.txt`.
 - **Government sites are unreliable / CAPTCHA intermitente**: `gov.br` and `finep.gov.br` are slow, may return 5xx, and occasionally serve a CAPTCHA page ("human visitor"). `fetch_text` retries; parsers return 0 results gracefully when all attempts are blocked.
 - **SETEC (`gov.br/mec`)**: after several accesses it may block for minutes — rerun later.
 - **MCTI (removido)**: a página de editais passou a exigir login gov.br (302 → `require_login`) e o link de referência virou 404 — parser removido do sistema em 04/08/2026. Reavaliar se o MCTI voltar a publicar listagem pública.
-- **Tests/lint**: pytest (68 tests) and CI (lint+test+build-windows); `ruff check .` and `ruff format --check .` are clean. CI also runs weekly (cron) and by `workflow_dispatch`, because the bot's push does not trigger workflows.
+- **Tests/lint**: pytest (71 tests) and CI (lint+test+build-windows); `ruff check .` and `ruff format --check .` are clean. CI also runs weekly (cron) and by `workflow_dispatch`, because the bot's push does not trigger workflows.
 - **Deploy automático**: o `crawl.yml` roda em IP de datacenter (Azure) — `gov.br` pode bloquear; o job aceita resultado parcial e o site mantém a última versão boa. Rodada manual via `workflow_dispatch`.
 - **Dependency manifest**: runtime deps in `requirements.txt` (httpx, beautifulsoup4, pandas, openpyxl, pypdf) and `pyproject.toml`.
 
