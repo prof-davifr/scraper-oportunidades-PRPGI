@@ -549,7 +549,7 @@ class OpportunityDatabase:
 <div class="container">
   <header>
     <div>
-      <h1>Editais de Pesquisa e Inovação</h1>
+      <h1>Editais Externos de Pesquisa e Inovação</h1>
       <p>Assessoria de Ciência de Dados - NPP - PRPGI / IFBA</p>
     </div>
     <img class="logo" src="data:image/svg+xml;base64,{logo_b64}" alt="Instituto Federal da Bahia">
