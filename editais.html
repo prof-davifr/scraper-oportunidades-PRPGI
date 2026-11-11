@@ -100,8 +100,8 @@
   </div>
   <div class="stats">
     <button class="btn-sobre" onclick="openSobre()">Sobre</button>
-    <span class="badge badge-total" data-inst="" onclick="filterByInst('')">Total: 223</span>
-    <button class="badge badge-capes" data-inst="CAPES" onclick="filterByInst('CAPES')">CAPES (96)</button><button class="badge badge-cnpq" data-inst="CNPq" onclick="filterByInst('CNPq')">CNPq (19)</button><button class="badge badge-fapesb" data-inst="FAPESB" onclick="filterByInst('FAPESB')">FAPESB (24)</button><button class="badge badge-finep" data-inst="FINEP" onclick="filterByInst('FINEP')">FINEP (32)</button><button class="badge badge-setec" data-inst="SETEC" onclick="filterByInst('SETEC')">SETEC (52)</button>
+    <span class="badge badge-total" data-inst="" onclick="filterByInst('')">Total: 225</span>
+    <button class="badge badge-capes" data-inst="CAPES" onclick="filterByInst('CAPES')">CAPES (96)</button><button class="badge badge-cnpq" data-inst="CNPq" onclick="filterByInst('CNPq')">CNPq (20)</button><button class="badge badge-fapesb" data-inst="FAPESB" onclick="filterByInst('FAPESB')">FAPESB (25)</button><button class="badge badge-finep" data-inst="FINEP" onclick="filterByInst('FINEP')">FINEP (32)</button><button class="badge badge-setec" data-inst="SETEC" onclick="filterByInst('SETEC')">SETEC (52)</button>
   </div>
   <div class="filter-bar">
     <input type="text" id="filterTitle" placeholder="Buscar por título..." oninput="filterTable()">
@@ -117,8 +117,8 @@
     </select>
     <select id="filterStatus" onchange="filterTable()">
       <option value="abertos" selected>Esconder prazos encerrados</option>
-      <option value="">Incluir prazos encerrados (37)</option>
-      <option value="encerrados">Só prazos encerrados (37)</option>
+      <option value="">Incluir prazos encerrados (38)</option>
+      <option value="encerrados">Só prazos encerrados (38)</option>
     </select>
   </div>
   <div class="table-wrap">
@@ -133,6 +133,20 @@
         </tr>
       </thead>
       <tbody><tr class="recent" data-status="aberto">
+                <td class="inst">CNPq</td>
+                <td class="title"><a href="https://www.gov.br/cnpq/pt-br/chamadas/todas-as-chamadas/chamadas-2026/chamada-no-37-2026/chamada-publica-cnpq-N-37-2026" target="_blank" rel="noopener">Chamada Pública MCTI/CNPq/CISB/SAAB AB Nº 37/2026 - Cooperação Brasil-Suécia</a></td>
+                <td class="pub">11/11/2026</td>
+                <td class="deadline">12/03/2027</td>
+                <td class="docs">—</td>
+            </tr>
+<tr class="recent expired" data-status="encerrado">
+                <td class="inst">FAPESB</td>
+                <td class="title"><a href="https://www.fapesb.ba.gov.br/diretrizes-especificas-da-fapesb-4o-chamada-transnacional-conjunta-parceria-para-economia-azul-sustentavel-2026-2027/" target="_blank" rel="noopener">DIRETRIZES ESPECÍFICAS DA FAPESB – 4º CHAMADA TRANSNACIONAL CONJUNTA – PARCERIA PARA ECONOMIA AZUL SUSTENTÁVEL 2026 – 2027</a></td>
+                <td class="pub">10/11/2026</td>
+                <td class="deadline">10/07/2026</td>
+                <td class="docs">—</td>
+            </tr>
+<tr class="recent" data-status="aberto">
                 <td class="inst">CAPES</td>
                 <td class="title"><a href="https://www.gov.br/capes/pt-br/centrais-de-conteudo/editais/edital_2905712_sei_2905378_edital_27_2026.pdf/@@display-file/file" target="_blank" rel="noopener">Edital PAEP-EB nº 27/2026 - formato, pdf, 160kb</a> <a class="page-link" href="https://www.gov.br/capes/pt-br/acesso-a-informacao/acoes-e-programas/educacao-basica/programa-de-apoio-a-eventos-no-pais-para-a-educacao-basica-paep-eb" target="_blank" rel="noopener" title="Página do edital" aria-label="Página do edital"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a></td>
                 <td class="pub">03/11/2026</td>
@@ -244,14 +258,14 @@
                 <td class="deadline">—</td>
                 <td class="docs"><details class="docs"><summary title="Documentos relacionados">1</summary><ul><li><a href="https://www.gov.br/capes/pt-br/centrais-de-conteudo/editais/edital_2896676_sei_2896323_edital_25_2026___alteracao.pdf/@@display-file/file" target="_blank" rel="noopener">Alteração - Edital nº 25/2026 - Edição 2027, formato, pdf, 50,3kb</a> <span class="docdate">(16/09/2026)</span></li></ul></details></td>
             </tr>
-<tr class="recent" data-status="aberto">
+<tr data-status="aberto">
                 <td class="inst">CAPES</td>
                 <td class="title"><a href="https://www.gov.br/capes/pt-br/centrais-de-conteudo/editais/edital_2848691_sei_2847430_edital_n__21_2026.pdf/@@display-file/file" target="_blank" rel="noopener">Edital nº 21/2026 - Programa de Desenvolvimento da Pós-Graduação (PDPG) – Parcerias Estratégicas nos Estados VI – Rede de Pesquisa e Desenvolvimento da Região Nordeste, formato, pdf, 177kb</a> <a class="page-link" href="https://www.gov.br/capes/pt-br/acesso-a-informacao/acoes-e-programas/bolsas/programas-estrategicos/desenvolvimento-regional/redes-de-pesquisa-e-desenvolvimento/programa-rede-de-pesquisa-e-desenvolvimento-da-regiao-nordeste" target="_blank" rel="noopener" title="Página do edital" aria-label="Página do edital"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a></td>
                 <td class="pub">11/09/2026</td>
                 <td class="deadline">—</td>
                 <td class="docs"><details class="docs"><summary title="Documentos relacionados">1</summary><ul><li><a href="https://www.gov.br/capes/pt-br/centrais-de-conteudo/editais/edital_2894158_sei_2893573_edital_n__21_2026.pdf/@@display-file/file" target="_blank" rel="noopener">Alteração Edital nº 21/2026 - Programa de Desenvolvimento da Pós-Graduação (PDPG) – Parcerias Estratégicas nos Estados VI – Rede de Pesquisa e Desenvolvimento da Região Nordeste, formato, pdf, 69,6kb</a> <span class="docdate">(11/09/2026)</span></li></ul></details></td>
             </tr>
-<tr class="recent" data-status="aberto">
+<tr data-status="aberto">
                 <td class="inst">FAPESB</td>
                 <td class="title"><a href="https://www.fapesb.ba.gov.br/diretrizes-especificas-da-fapesb-chamada-transnacional-conjunta-water4all-2026-2027-gestao-sustentavel-dos-recursos-hidricos/" target="_blank" rel="noopener">DIRETRIZES ESPECÍFICAS DA FAPESB – CHAMADA TRANSNACIONAL CONJUNTA WATER4ALL 2026 – 2027 “GESTÃO SUSTENTÁVEL DOS RECURSOS HÍDRICOS”</a></td>
                 <td class="pub">11/09/2026</td>
