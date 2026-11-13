@@ -472,6 +472,9 @@ class OpportunityDatabase:
 <title>Editais — PRPGI</title>
 <style>
   *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  /* Base de 14px (em vez de 16px): os tamanhos e recuos em rem encolhem
+     juntos, e a tabela cabe no iframe do portal sem vazar. */
+  html {{ font-size: 14px; }}
   body {{
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     background: #f5f5f5; color: #222; line-height: 1.5;
@@ -541,7 +544,7 @@ class OpportunityDatabase:
   @media (max-width: 640px) {{
     header {{ padding: 1rem; }}
     header .logo {{ height: 48px; }}
-    td, th {{ padding: .4rem .3rem; font-size: .8rem; }}
+    td, th {{ padding: .4rem .3rem; font-size: .85rem; }}
   }}
 </style>
 </head>
