@@ -534,12 +534,17 @@ class OpportunityDatabase:
   .empty {{ text-align: center; padding: 3rem 1rem; color: #888; }}
   .btn-sobre {{ background: #fff; color: #165c33; border: 2px solid #165c33; border-radius: 20px; padding: .35em .75em; font-size: .8rem; cursor: pointer; font-weight: 600; transition: background .15s; }}
   .btn-sobre:hover {{ background: #eef7ef; }}
-  .modal-overlay {{ display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 50; align-items: center; justify-content: center; padding: 1rem; }}
-  .modal {{ background: #fff; border-radius: 12px; max-width: 560px; width: 100%; padding: 1.75rem 2rem; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,.3); max-height: 90vh; overflow-y: auto; }}
-  .modal h2 {{ color: #165c33; margin-bottom: .75rem; font-size: 1.2rem; }}
-  .modal p {{ margin: .5rem 0; font-size: .9rem; color: #444; line-height: 1.55; }}
-  .modal-close {{ position: absolute; top: .75rem; right: .9rem; background: none; border: none; font-size: 1.15rem; cursor: pointer; color: #888; }}
-  .modal-close:hover {{ color: #165c33; }}
+  .sobre-panel {{ display: none; background: #fff; border: 1px solid #cfe3d3; border-left: 4px solid #165c33; border-radius: 8px; padding: 1rem 1.25rem; margin: .75rem 0; position: relative; }}
+  .sobre-panel.open {{ display: block; }}
+  .sobre-panel h2 {{ color: #165c33; margin-bottom: .5rem; font-size: 1.1rem; }}
+  .sobre-panel h3 {{ color: #165c33; margin: .75rem 0 .25rem; font-size: .95rem; }}
+  .sobre-panel p {{ margin: .4rem 0; font-size: .9rem; color: #444; line-height: 1.55; }}
+  .sobre-panel ul {{ margin: .25rem 0 .25rem 1.25rem; font-size: .85rem; color: #444; line-height: 1.6; }}
+  .sobre-panel li {{ overflow-wrap: anywhere; }}
+  .sobre-panel a {{ color: #1a73e8; text-decoration: none; }}
+  .sobre-panel a:hover {{ text-decoration: underline; }}
+  .sobre-close {{ position: absolute; top: .5rem; right: .75rem; background: none; border: none; font-size: 1.1rem; cursor: pointer; color: #888; }}
+  .sobre-close:hover {{ color: #165c33; }}
   .sobre-note {{ color: #8a6d3b; font-size: .8rem; }}
   @media (max-width: 640px) {{
     header {{ padding: 1rem; }}
@@ -557,21 +562,27 @@ class OpportunityDatabase:
     </div>
     <img class="logo" src="data:image/svg+xml;base64,{logo_b64}" alt="Instituto Federal da Bahia">
   </header>
-  <div class="modal-overlay" id="sobreModal" onclick="if(event.target === this) closeSobre()">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sobreTitle">
-      <button class="modal-close" onclick="closeSobre()" aria-label="Fechar">✕</button>
-      <h2 id="sobreTitle">Sobre</h2>
-      <p><strong>Versão beta — em testes.</strong> Esta página coleta automaticamente editais e chamadas de fomento à pesquisa das fontes oficiais (CAPES, CNPq, FINEP, FAPESB e SETEC) e é atualizada diariamente.</p>
-      <p>Faz parte das ações do <strong>Núcleo de Prospecção de Projetos</strong> e da <strong>Assessoria de Ciência de Dados</strong> — PRPGI/IFBA.</p>
-      <p>Responsável: <strong>Davi Franco Rêgo</strong>.</p>
-      <p class="sobre-note">⚠️ Em caso de divergência ou dúvida, consulte sempre o edital original na fonte.</p>
-    </div>
-  </div>
   <div class="stats">
-    <button class="btn-sobre" onclick="openSobre()">Sobre</button>
+    <button class="btn-sobre" id="btnSobre" onclick="toggleSobre()" aria-expanded="false" aria-controls="sobrePanel">Sobre</button>
     <span class="badge badge-total" data-inst="" onclick="filterByInst('')">Total: {total_count}</span>
     {inst_badges}
   </div>
+  <section class="sobre-panel" id="sobrePanel" aria-labelledby="sobreTitle">
+    <button class="sobre-close" onclick="toggleSobre()" aria-label="Fechar">✕</button>
+    <h2 id="sobreTitle">Sobre</h2>
+    <p><strong>Versão beta — em testes.</strong> Esta página coleta automaticamente editais e chamadas de fomento à pesquisa das fontes oficiais e é atualizada diariamente.</p>
+    <h3>Páginas monitoradas</h3>
+    <ul>
+      <li><strong>CAPES:</strong> <a href="https://www.gov.br/capes/pt-br/assuntos/editais-e-resultados-capes" target="_blank" rel="noopener">gov.br/capes — editais e resultados</a></li>
+      <li><strong>CNPq:</strong> <a href="https://www.gov.br/cnpq/pt-br/chamadas/abertas-para-submissao" target="_blank" rel="noopener">gov.br/cnpq — chamadas abertas para submissão</a></li>
+      <li><strong>FINEP:</strong> <a href="http://www.finep.gov.br/chamadas-publicas/chamadaspublicas?situacao=aberta" target="_blank" rel="noopener">finep.gov.br — chamadas públicas abertas</a></li>
+      <li><strong>FAPESB:</strong> <a href="https://www.fapesb.ba.gov.br/category/edital/" target="_blank" rel="noopener">fapesb.ba.gov.br — categoria Edital</a></li>
+      <li><strong>SETEC (MEC):</strong> <a href="https://www.gov.br/mec/pt-br/acesso-a-informacao/institucional/estrutura-organizacional/orgaos-especificos-singulares/secretaria-de-educacao-profissional/editais" target="_blank" rel="noopener">gov.br/mec — editais da Secretaria de Educação Profissional</a></li>
+    </ul>
+    <p>Faz parte das ações do <strong>Núcleo de Prospecção de Projetos</strong> e da <strong>Assessoria de Ciência de Dados</strong> — PRPGI/IFBA.</p>
+    <p>Responsável: <strong>Davi Franco Rêgo</strong>.</p>
+    <p class="sobre-note">⚠️ Em caso de divergência ou dúvida, consulte sempre o edital original na fonte.</p>
+  </section>
   <div class="filter-bar">
     <input type="text" id="filterTitle" placeholder="Buscar por título..." oninput="filterTable()">
     <select id="filterInst" onchange="filterTable()">
@@ -660,16 +671,13 @@ function sortTable(col) {{
     if (i === col) th.classList.add(dir > 0 ? 'sort-asc' : 'sort-desc');
   }});
 }}
-function openSobre() {{
-  document.getElementById('sobreModal').style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-}}
-function closeSobre() {{
-  document.getElementById('sobreModal').style.display = 'none';
-  document.body.style.overflow = '';
+function toggleSobre() {{
+  const p = document.getElementById('sobrePanel');
+  const open = p.classList.toggle('open');
+  document.getElementById('btnSobre').setAttribute('aria-expanded', open);
 }}
 document.addEventListener('keydown', e => {{
-  if (e.key === 'Escape') closeSobre();
+  if (e.key === 'Escape') document.getElementById('sobrePanel').classList.remove('open');
 }});
 filterTable();
 </script>
