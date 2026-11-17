@@ -519,7 +519,7 @@ class OpportunityDatabase:
   .docs details {{ position: relative; }}
   .docs summary {{ cursor: pointer; color: #165c33; font-weight: 600; user-select: none; }}
   .docs details[open] summary {{ margin-bottom: .25rem; }}
-  .docs ul {{ position: absolute; z-index: 5; left: 0; top: 100%; min-width: 420px; max-width: 640px;
+  .docs ul {{ position: absolute; z-index: 5; right: 0; top: 100%; min-width: 420px; max-width: 640px;
              background: #fff; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.15);
              list-style: none; padding: .5rem .75rem; margin: 0; white-space: normal; font-size: .8rem; }}
   .docs li {{ margin: .3rem 0; }}
